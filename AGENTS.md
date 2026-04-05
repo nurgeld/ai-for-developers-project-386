@@ -121,6 +121,7 @@ const booking = await api.bookings.create({ eventTypeId: 'abc', guestName: 'John
 ```typescript
 await api.owner.settings.update({ name: 'Tota', workDayStart: '09:00', workDayEnd: '18:00' });
 await api.owner.eventTypes.create({ name: 'Встреча 15 минут', description: '...', durationMinutes: 15 });
+await api.owner.eventTypes.update(id, { name: 'Новое название', description: 'Новое описание' });
 await api.owner.eventTypes.delete(id);
 await api.owner.bookings.list();                          // future only, startAt >= now, sorted ASC
 await api.owner.bookings.list({ eventTypeId: 'abc' });    // filtered by type

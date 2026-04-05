@@ -120,6 +120,15 @@ model CreateEventTypeRequest {
 }
 
 /**
+ * Запрос на обновление типа события (частичное обновление).
+ * Длительность изменить нельзя — только name и description.
+ */
+model UpdateEventTypeRequest {
+  name?: string;
+  description?: string;
+}
+
+/**
  * Запрос на обновление настроек владельца
  */
 model UpdateOwnerSettingsRequest {
@@ -301,6 +310,18 @@ interface OwnerAPI {
   createEventType(@body body: CreateEventTypeRequest):
     | EventType
     | DuplicateDurationError
+    | ValidationError;
+
+  /**
+   * Обновить тип события (частичное обновление).
+   * Длительность изменить нельзя после создания.
+   */
+  @route("/event-types/{id}")
+  @tag("Owner")
+  @patch
+  updateEventType(@path id: string, @body body: UpdateEventTypeRequest):
+    | EventType
+    | NotFoundError
     | ValidationError;
 
   /**
