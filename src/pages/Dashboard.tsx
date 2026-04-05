@@ -1,124 +1,84 @@
-import { useEffect, useState } from 'react';
-import { SimpleGrid, Card, Text, Group, Badge, RingProgress, Center, Stack, Loader } from '@mantine/core';
-import { IconCalendarEvent, IconClock, IconCalendarCheck } from '@tabler/icons-react';
-import { apiClient } from '../api/client';
-import type { Slot } from '../api/types';
-
-interface Stats {
-  eventTypesCount: number;
-  slotsCount: number;
-  bookedSlotsCount: number;
-  bookingsCount: number;
-}
+import { useState, useEffect } from 'react';
+import { Title, Text, SimpleGrid, Card, Group, Badge, Loader } from '@mantine/core';
+import { api } from '../api/client';
+import type { Booking, EventType } from '../api/types';
 
 export function Dashboard() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
+    async function loadData() {
       try {
-        const [eventTypes, slots, bookings] = await Promise.all([
-          apiClient.eventTypes.list(),
-          apiClient.slots.list({ eventTypeId: '' }),
-          apiClient.bookings.list(),
+        const [bookingsData, eventTypesData] = await Promise.all([
+          api.bookings.list(),
+          api.eventTypes.list(),
         ]);
-
-        setStats({
-          eventTypesCount: eventTypes.length,
-          slotsCount: slots.length,
-          bookedSlotsCount: slots.filter((s: Slot) => s.isBooked).length,
-          bookingsCount: bookings.length,
-        });
+        setBookings(bookingsData);
+        setEventTypes(eventTypesData);
       } catch (err) {
-        console.error('Failed to load stats:', err);
-        setStats({
-          eventTypesCount: 0,
-          slotsCount: 0,
-          bookedSlotsCount: 0,
-          bookingsCount: 0,
-        });
+        console.error('Failed to load dashboard data:', err);
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    };
+    }
     loadData();
   }, []);
 
-  if (loading) {
-    return (
-      <Center h={400}>
-        <Loader />
-      </Center>
-    );
-  }
+  if (loading) return <Loader />;
+  if (error) return <Text c="red">{error}</Text>;
 
-  const bookedPercent = stats ? Math.round((stats.bookedSlotsCount / (stats.slotsCount || 1)) * 100) : 0;
+  const eventTypeMap = new Map(eventTypes.map((et) => [et.id, et]));
+  const today = new Date().toLocaleDateString('en-CA');
+  const todayBookings = bookings.filter((b) => b.startAt.startsWith(today));
 
   return (
-    <Stack gap="lg">
-      <Text size="xl" fw={700}>Dashboard</Text>
-      
-      <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Типы событий</Text>
-              <Text size="xl" fw={700}>{stats?.eventTypesCount}</Text>
-            </div>
-            <IconCalendarEvent size={32} color="#228be6" />
-          </Group>
-        </Card>
+    <div>
+      <Title order={2} mb="md">Dashboard</Title>
 
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Всего слотов</Text>
-              <Text size="xl" fw={700}>{stats?.slotsCount}</Text>
-            </div>
-            <IconClock size={32} color="#40c057" />
-          </Group>
+      <SimpleGrid cols={{ base: 1, sm: 3 }} mb="xl">
+        <Card shadow="sm" padding="lg">
+          <Text size="sm" c="dimmed">Total Bookings</Text>
+          <Text size="xl" fw={700}>{bookings.length}</Text>
         </Card>
-
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Забронировано</Text>
-              <Text size="xl" fw={700}>{stats?.bookedSlotsCount}</Text>
-            </div>
-            <IconCalendarCheck size={32} color="#fab005" />
-          </Group>
+        <Card shadow="sm" padding="lg">
+          <Text size="sm" c="dimmed">Event Types</Text>
+          <Text size="xl" fw={700}>{eventTypes.length}</Text>
         </Card>
-
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Group justify="space-between">
-            <div>
-              <Text size="xs" c="dimmed" tt="uppercase" fw={700}>Бронирований</Text>
-              <Text size="xl" fw={700}>{stats?.bookingsCount}</Text>
-            </div>
-            <Badge size="lg" variant="light">Всего</Badge>
-          </Group>
+        <Card shadow="sm" padding="lg">
+          <Text size="sm" c="dimmed">Today</Text>
+          <Text size="xl" fw={700}>{todayBookings.length}</Text>
         </Card>
       </SimpleGrid>
 
-      <Card shadow="sm" padding="lg" radius="md" withBorder>
-        <Text size="lg" fw={600} mb="md">Загрузка слотов</Text>
-        <Center>
-          <RingProgress
-            size={150}
-            thickness={14}
-            roundCaps
-            sections={[{ value: bookedPercent, color: 'blue' }]}
-            label={
-              <Center>
-                <Text size="xl" fw={700}>{bookedPercent}%</Text>
-              </Center>
-            }
-          />
-        </Center>
-        <Text size="sm" c="dimmed" ta="center" mt="md">
-          Процент забронированных слотов
-        </Text>
-      </Card>
-    </Stack>
+      <Title order={4} mb="md">Upcoming Bookings</Title>
+      {bookings.length === 0 ? (
+        <Text c="dimmed">No bookings yet.</Text>
+      ) : (
+        <SimpleGrid cols={{ base: 1, md: 2 }}>
+          {bookings.map((booking) => {
+            const et = eventTypeMap.get(booking.eventTypeId);
+            return (
+              <Card key={booking.id} shadow="sm" padding="md">
+                <Group justify="space-between" mb="xs">
+                  <Text fw={600}>{et?.title || 'Unknown'}</Text>
+                  <Badge>{booking.guestName}</Badge>
+                </Group>
+                <Text size="sm" c="dimmed">
+                  {new Date(booking.startAt).toLocaleString()} — {new Date(booking.endAt).toLocaleTimeString()}
+                </Text>
+                <Text size="sm">{booking.guestEmail}</Text>
+                {booking.comment && (
+                  <Text size="sm" mt="xs" c="dimmed">{booking.comment}</Text>
+                )}
+              </Card>
+            );
+          })}
+        </SimpleGrid>
+      )}
+    </div>
   );
 }

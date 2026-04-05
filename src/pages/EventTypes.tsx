@@ -1,117 +1,79 @@
-import { useEffect, useState } from 'react';
-import { 
-  Table, Button, Group, TextInput, Textarea, NumberInput, 
-  Modal, Stack, Text, Badge, ActionIcon, Card, Loader, Center, Tooltip
+import { useState, useEffect } from 'react';
+import {
+  Table, Button, Group, TextInput, Textarea,
+  Modal, Stack, Text, Badge, Card, Loader, SegmentedControl
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconPlus, IconTrash, IconClock } from '@tabler/icons-react';
-import { apiClient } from '../api/client';
-import type { EventType, CreateEventTypeRequest } from '../api/types';
+import { IconPlus } from '@tabler/icons-react';
+import { api } from '../api/client';
+import type { EventType } from '../api/types';
 
 export function EventTypes() {
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [opened, { open, close }] = useDisclosure(false);
-  const [form, setForm] = useState<CreateEventTypeRequest>({
+  const [form, setForm] = useState({
     title: '',
     description: '',
-    durationMinutes: 30,
+    durationMinutes: 15,
   });
 
-  const loadEventTypes = async () => {
-    try {
-      const data = await apiClient.eventTypes.list();
-      setEventTypes(data);
-    } catch (err) {
-      console.error('Failed to load event types:', err);
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadEventTypes();
+    api.eventTypes.list()
+      .then(setEventTypes)
+      .catch((err) => {
+        console.error('Failed to load event types:', err);
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSubmit = async () => {
+    if (!form.title || !form.durationMinutes) return;
     try {
-      await apiClient.eventTypes.create(form);
+      await api.eventTypes.create(form);
+      setForm({ title: '', description: '', durationMinutes: 15 });
       close();
-      setForm({ title: '', description: '', durationMinutes: 30 });
-      loadEventTypes();
+      const data = await api.eventTypes.list();
+      setEventTypes(data);
     } catch (err) {
-      console.error('Failed to create event type:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create');
     }
   };
 
-  if (loading) {
-    return (
-      <Center h={400}>
-        <Loader />
-      </Center>
-    );
-  }
+  if (loading) return <Loader />;
+  if (error) return <Text c="red">{error}</Text>;
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
-        <Text size="xl" fw={700}>Типы событий</Text>
+        <Text size="xl" fw={700}>Event Types</Text>
         <Button leftSection={<IconPlus size={16} />} onClick={open}>
-          Добавить тип события
+          Add Event Type
         </Button>
       </Group>
 
       {eventTypes.length === 0 ? (
         <Card shadow="sm" padding="lg" withBorder>
-          <Text c="dimmed" ta="center">Нет типов событий. Создайте первый тип события.</Text>
+          <Text c="dimmed" ta="center">No event types yet. Create your first one.</Text>
         </Card>
       ) : (
         <Table striped highlightOnHover>
-          <Table.Thead>
+            <Table.Thead>
             <Table.Tr>
-              <Table.Th>Название</Table.Th>
-              <Table.Th>Описание</Table.Th>
-              <Table.Th>Длительность</Table.Th>
-              <Table.Th>Действия</Table.Th>
+              <Table.Th>Title</Table.Th>
+              <Table.Th>Description</Table.Th>
+              <Table.Th>Duration</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {eventTypes.map((eventType) => (
-              <Table.Tr key={eventType.id}>
+            {eventTypes.map((et) => (
+              <Table.Tr key={et.id}>
+                <Table.Td><Text fw={600}>{et.title}</Text></Table.Td>
+                <Table.Td>{et.description}</Table.Td>
                 <Table.Td>
-                  <Text fw={600}>{eventType.title}</Text>
-                </Table.Td>
-                <Table.Td>{eventType.description}</Table.Td>
-                <Table.Td>
-                  <Badge leftSection={<IconClock size={12} />}>
-                    {eventType.durationMinutes} мин
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <Tooltip label="Настроить доступность">
-                      <ActionIcon 
-                        variant="light" 
-                        color="blue"
-                        component="a"
-                        href={`/event-types/${eventType.id}/availability`}
-                      >
-                        <IconClock size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Удалить">
-                      <ActionIcon 
-                        variant="light" 
-                        color="red"
-                        onClick={async () => {
-                          if (confirm('Удалить этот тип события?')) {
-                            setEventTypes(prev => prev.filter(e => e.id !== eventType.id));
-                          }
-                        }}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+                  <Badge>{et.durationMinutes} min</Badge>
                 </Table.Td>
               </Table.Tr>
             ))}
@@ -119,32 +81,35 @@ export function EventTypes() {
         </Table>
       )}
 
-      <Modal opened={opened} onClose={close} title="Добавить тип события" centered>
+      <Modal opened={opened} onClose={close} title="Add Event Type" centered>
         <Stack>
           <TextInput
-            label="Название"
-            placeholder="Консультация"
+            label="Title"
+            placeholder="Consultation"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             required
           />
           <Textarea
-            label="Описание"
-            placeholder="Описание вашего события"
+            label="Description"
+            placeholder="Description of the event"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
-          <NumberInput
-            label="Длительность (минуты)"
-            value={form.durationMinutes}
-            onChange={(val) => setForm({ ...form, durationMinutes: Number(val) })}
-            min={5}
-            max={480}
-            required
-          />
+          <Stack gap="xs">
+            <Text size="sm" fw={500}>Duration (minutes)</Text>
+            <SegmentedControl
+              value={String(form.durationMinutes)}
+              onChange={(val) => setForm({ ...form, durationMinutes: Number(val) })}
+              data={[
+                { label: '15 min', value: '15' },
+                { label: '30 min', value: '30' },
+              ]}
+            />
+          </Stack>
           <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={close}>Отмена</Button>
-            <Button onClick={handleSubmit}>Создать</Button>
+            <Button variant="default" onClick={close}>Cancel</Button>
+            <Button onClick={handleSubmit}>Create</Button>
           </Group>
         </Stack>
       </Modal>

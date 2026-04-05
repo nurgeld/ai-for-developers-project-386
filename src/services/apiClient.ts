@@ -6,7 +6,7 @@ import type {
   CreateEventTypeRequest,
   CreateBookingRequest,
   CreateAvailabilityRequest,
-} from './types';
+} from '../api/types';
 
 const BASE = '/api';
 
@@ -96,31 +96,3 @@ export class ApiClient {
     });
   }
 }
-
-// Create instance for backward compatibility
-const apiInstance = new ApiClient();
-
-// Export both the class instance and a backward-compatible object
-export const api = {
-  eventTypes: {
-    list: () => apiInstance.listEventTypes(),
-    create: (body: CreateEventTypeRequest) => apiInstance.createEventType(body),
-  },
-  slots: {
-    list: (params?: { eventTypeId?: string; start?: string; end?: string }) => 
-      apiInstance.listSlots(params),
-  },
-  bookings: {
-    list: (params?: { eventTypeId?: string; start?: string; end?: string; guestEmail?: string; status?: string }) => 
-      apiInstance.listBookings(params),
-    create: (body: CreateBookingRequest) => apiInstance.createBooking(body),
-  },
-  availability: {
-    list: () => apiInstance.listAvailability(),
-    create: (body: CreateAvailabilityRequest) => apiInstance.createAvailability(body),
-    delete: (id: string) => apiInstance.deleteAvailability(id),
-  },
-};
-
-// Also export the class instance for use with services
-export const apiClient = apiInstance;

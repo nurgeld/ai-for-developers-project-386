@@ -1,215 +1,181 @@
 # Agent Guidelines for React/TypeScript/Vite Codebase
 
+## Engineering Principles
+
+- **Fix the cause, not the symptom.** Investigate root causes before applying workarounds.
+- **Don't modify code you didn't change.** Revert unexpected modifications.
+- **Extend existing models first.** Update existing types before adding parallel entities.
+- **YAGNI & DRY.** Don't over-engineer; reuse existing abstractions.
+
+---
+
 ## Build, Lint, and Test Commands
 
-### Development
+### Makefile (preferred)
 ```bash
-# Start development server
-npm run dev
-
-# Preview production build
-npm run preview
+make help            # Show all available commands
+make dev             # Start development server
+make dev-mock        # Start with Prism mock API (port 4010)
+make build           # TypeScript compile + Vite build
+make lint            # Run ESLint
+make test            # Run tests (requires vitest setup)
+make test-watch      # Run tests in watch mode
+make mock-api        # Start Prism mock server
+make compile-api     # Compile TypeSpec to OpenAPI
+make generate-types  # Generate TS types from OpenAPI
+make clean           # Remove build artifacts
+make stop            # Stop all services
+make restart         # Stop all and start with real backend
+make restart-mock    # Stop all and start with mock API
 ```
 
-### Building
+### Single Test Commands
 ```bash
-# Build for production
-npm run build
+npx vitest run src/components/Button.test.tsx   # Run single test file
+npx vitest run -t "should render"               # Run tests matching name
 ```
 
-### Linting
-```bash
-# Run ESLint on all files
-npm run lint
-
-# Run ESLint on specific file or directory
-npx eslint src/components/Button.tsx
-npx eslint src/pages/
-```
-
-### Testing
-*Note: This project currently doesn't have a testing framework configured.*
-To add testing capabilities, consider installing:
-```bash
-# For unit tests
-npm install -D vitest @vitest/coverage-v8 @testing-library/react @testing-library/jest-dom @testing-library/user-event
-
-# For E2E tests
-npm install -D playwright @playwright/test
-```
-
-Once testing is configured, typical commands would be:
-```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run a single test file
-npx vitest run src/components/Button.test.tsx
-
-# Run a single test function
-npx vitest run -t "should render button with correct text"
-```
+---
 
 ## Code Style Guidelines
 
-### TypeScript Usage
-- Use strict type checking enabled in tsconfig.json
-- Prefer interfaces for object shapes, types for unions/primitives
-- Avoid `any` type; use `unknown` when type is uncertain and validate
-- Use explicit return types for exported functions
-- Use type assertions (`as Type`) sparingly and only when necessary
+### TypeScript
+- Strict mode enabled; avoid `any`, prefer `unknown`
+- Prefer interfaces for object shapes, types for unions
+- Explicit return types for exported functions
 
-### Import Organization
-1. External libraries (alphabetical)
-2. Internal absolute imports (alphabetical)
-3. Relative imports (alphabetical)
-4. Types-only imports on separate lines when beneficial
-5. No unused imports allowed
-
-Example:
+### Import Order
 ```typescript
-// External libraries
 import { useState } from 'react';
-import { Button } from '@mantine/core';
+import { Card } from '@mantine/core';
 
-// Internal absolute imports
-import { apiClient } from '@/api/client';
-import { useEventTypes } from '@/hooks/useEventTypes';
+import { api } from '../api/client';
+import { SlotGrid } from '../components/SlotGrid';
 
-// Relative imports
-import { ButtonVariant } from './Button.types';
-
-// Types-only imports
-import type { EventType } from '@/api/types';
+import type { Booking } from '../api/types';
 ```
 
 ### Formatting
-- Use 2 spaces for indentation (Prettier/ESLint default)
-- Maximum line length: 100 characters
+- 2 spaces indentation, 100 char max line length
 - Trailing commas in multiline objects/arrays
-- Semicolons required
-- No console.log in production code (except for debugging)
+- Semicolons required; no `console.log` in production code
 
 ### Naming Conventions
-- Components: PascalCase (e.g., `EventTypeCard`)
-- Functions/variables: camelCase (e.g., `createEventType`)
-- Constants: UPPER_SNAKE_CASE (e.g., `MAX_RETRIES`)
-- Files: 
-  - Components: PascalCase.tsx (e.g., `EventTypeCard.tsx`)
-  - Hooks: camelCase.ts (e.g., `useEventTypes.ts`)
-  - Utilities: camelCase.ts (e.g., `dateUtils.ts`)
-  - Types: PascalCase.ts (e.g., `EventType.types.ts`)
-  - Tests: same name as file with .test suffix (e.g., `EventTypeCard.test.tsx`)
+- Components: PascalCase (`SlotGrid.tsx`)
+- Hooks: camelCase with `use` prefix (`useBookings.ts`)
+- Utilities: camelCase (`formatDate.ts`)
+- Types: PascalCase (from `types.ts`, `generated.ts`)
+- Constants: UPPER_SNAKE_CASE
+- Tests: `*.test.tsx` alongside source files
 
-### Error Handling
-- Use try/catch for async operations
-- Throw specific errors rather than generic Error when possible
-- Handle API errors consistently using the apiClient pattern
-- Display user-friendly error messages in UI components
-- Log errors to console in development only
+### Exports
+- Prefer named exports; default export only for root `App.tsx`
 
-### React Specific
-- Use functional components with hooks
-- Prefer `const` for component declarations
-- Use early returns for conditional rendering
-- Extract complex JSX into separate components
-- Use useCallback/useMemo for performance optimization
-- Follow React Hooks Rules strictly
-- Use Fragment (`<>`) instead of unnecessary divs
-- Accessibility: Always include meaningful alt text, labels, etc.
+---
 
-### Mantine UI Specific
-- Import styles globally in App.tsx (already configured)
-- Use Mantine's theme customization sparingly
-- Follow Mantine's naming conventions for props
-- Use Mantine's default breakpoints for responsive design
-- Utilize Mantine hooks when appropriate (use-form, use-local-storage, etc.)
+## React Guidelines
 
-### API Communication
-- Use the provided `apiClient` in `src/api/client.ts`
-- Handle loading and error states in UI components
-- Use React Query/SWR for complex data fetching (to be implemented)
-- Validate API responses with TypeScript types
-- Implement retry logic for failed requests when appropriate
+- Functional components with hooks
+- Named function declarations: `export function Component() {}`
+- Early returns for loading/error states
+- Use `useCallback`/`useMemo` when needed
+- Include accessibility attributes (alt, aria-label)
 
-### File Organization
+### Mantine UI
+- Import styles in `App.tsx` (already done)
+- Use responsive props: `cols={{ base: 1, sm: 3 }}`
+- Follow Mantine prop naming (`c` for color, `fw` for fontWeight)
+
+---
+
+## File Organization
+
 ```
 src/
-├── api/          # API client and types
+├── api/          # API client, types, generated code
+│   ├── client.ts      # API request functions
+│   ├── types.ts       # Re-exports from generated
+│   └── generated.ts   # OpenAPI-generated types
 ├── components/   # Reusable UI components
-├── hooks/        # Custom React hooks
-├── pages/        # Page components (route components)
-├── styles/       # Global styles and theme customization
-└── utils/        # Utility functions and helpers
+├── pages/        # Route-level components
+└── main.tsx      # App entry point
+docs/              # Mockups and design assets (gitignored)
 ```
 
-### Git Practices
-- Commit messages: Conventional Commits format
-  - feat: new feature
-  - fix: bug fix
-  - docs: documentation changes
-  - style: formatting, missing semicolons, etc.
-  - refactor: code restructuring
-  - perf: performance improvements
-  - test: adding or modifying tests
-  - chore: build process, tooling changes
-- Branch naming: feature/, fix/, docs/, refactor/
-- Pull requests: Descriptive title, summary of changes, related issues
+---
 
-### Performance Considerations
-- Lazy load routes and heavy components
-- Use React.memo for components with stable props
-- Virtualize long lists
-- Optimize images and assets
-- Bundle analysis: Use `vite build --mode analyzer`
+## API Patterns (v2.0.0)
 
-### Security Guidelines
-- Sanitize user inputs to prevent XSS
-- Use proper HTTP methods for API calls (GET for data retrieval, POST for creation, etc.)
-- Handle authentication tokens securely
-- Validate data both client-side and server-side
-- Environment variables: Never commit .env files, use VITE_ prefix for client-side variables
+### Public API (`/api`)
+```typescript
+import { api } from '../api/client';
+import type { Booking, Slot, EventType, OwnerSettings } from '../api/types';
 
-## Additional Configuration Files
+const settings: OwnerSettings = await api.settings.get();
+const eventTypes: EventType[] = await api.eventTypes.list();
+const slots: Slot[] = await api.slots.list({ eventTypeId: 'abc', startDate: '2026-03-01', endDate: '2026-03-31' });
+const booking = await api.bookings.create({ eventTypeId: 'abc', guestName: 'John', guestEmail: 'john@example.com', startAt: '2026-03-28T09:00:00Z' });
+```
 
-### ESLint Configuration
-See `.eslintrc.js` or `eslint.config.js` for current rules
-- TypeScript-aware linting enabled
-- React hooks rules enforced
-- Unused variables prohibited
-- No console.log in production
+### Owner API (`/api/owner`)
+```typescript
+await api.owner.settings.update({ name: 'Tota', workDayStart: '09:00', workDayEnd: '18:00' });
+await api.owner.eventTypes.create({ name: 'Встреча 15 минут', description: '...', durationMinutes: 15 });
+await api.owner.eventTypes.delete(id);
+await api.owner.bookings.list();                          // future only, startAt >= now, sorted ASC
+await api.owner.bookings.list({ eventTypeId: 'abc' });    // filtered by type
+await api.owner.bookings.cancel(id);                      // returns 204 No Content
+```
 
-### TypeScript Configuration
-See `tsconfig.json` and related files
-- Strict mode enabled
-- Path aliases configured (@/ prefix)
-- JSX parsing for React
-- Module resolution configured for Node.js and browser
+### Guest Flow (Public API)
+1. `GET /api/settings` — owner profile (name, avatar)
+2. `GET /api/event-types` — list of event types for selection
+3. `GET /api/slots?eventTypeId=&startDate=&endDate=` — slots for month (counters)
+4. `GET /api/slots?eventTypeId=&startDate=&endDate=` — slots for selected day
+5. `POST /api/bookings` — create booking
 
-### Vite Configuration
-See `vite.config.ts`
-- React plugin configured
-- Build optimization settings
-- Preview server configuration
+### Slot Grid Rules
+- Slots generated with step = `EventType.durationMinutes` (15 or 30 min)
+- Within `OwnerSettings.workDayStart` - `workDayEnd` (default: 09:00-18:00)
+- `Slot.isBooked: true` means slot is occupied — no guest data returned in public API
+- **Overlap rule**: cannot book overlapping time even with different event types → 409 Conflict
+
+### Booking Model
+- `eventTypeName` is a **snapshot** saved at booking creation time
+- Survives event type deletion (orphan bookings)
+- `listBookings` without filters returns only future bookings (`startAt >= now()`), sorted ASC
+
+### Error Handling
+- 409 Conflict: `SLOT_ALREADY_BOOKED` (slot occupied) or `DUPLICATE_DURATION` (event type)
+- 400 Bad Request: `INVALID_SLOT_TIME` (not aligned to grid or outside work hours)
+- 404 Not Found: resource doesn't exist
+- Use try/catch; show user-friendly messages via Mantine `Text` with `c="red"`
+
+---
 
 ## Project-Specific Notes
 
-### TypeSpec API Definition
-- The API contract is defined in `api/main.tsp` using TypeSpec
-- Generated TypeScript types are available in `src/api/types.ts`
-- When updating the API specification, remember to regenerate types
+- **TypeSpec API**: Edit `api/main.tsp`, then run `npm run compile:api`
+- **Type Generation**: Run `npm run generate:types` to update `src/api/generated.ts`
+- **Backend**: Python/FastAPI on port 8000 (in-memory storage)
+- **Mock API**: Prism serves mock responses on port 4010 using `src/api/openapi.json`
+- **Seed data**: On startup, creates "Встреча 15 минут" (15min) and "Встреча 30 минут" (30min)
+- **OwnerSettings defaults**: workDayStart="09:00", workDayEnd="18:00"
+- **No authorization**: single pre-defined owner profile, no login/registration
+- **docs/**: Contains mockups and user flow video (gitignored, large binary files)
 
-### Backend Structure
-- The Python/FastAPI backend is located in the `backend/` directory
-- API routes are in `backend/app/routers/`
-- Data models are in `backend/app/models.py`
+---
 
-### Environment Variables
-- Vite requires environment variables to be prefixed with `VITE_` to be exposed to the client
-- Example: `VITE_API_URL=http://localhost:8000`
+## Git Practices
+
+- Conventional Commits: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`
+- Branch naming: `feature/`, `fix/`, `docs/`, `refactor/`
+
+---
+
+## Configuration
+
+- **ESLint**: `eslint.config.js` - TypeScript-aware with React hooks rules
+- **TypeScript**: `tsconfig.app.json` - Strict mode enabled
+- **Vite**: `vite.config.ts` - React plugin with API proxy to backend
+- **API Proxy**: `/api` → `http://localhost:8000` (or `4010` in mock mode)

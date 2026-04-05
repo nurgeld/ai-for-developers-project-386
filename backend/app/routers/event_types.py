@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app.models import EventType, CreateEventTypeRequest
 from app.storage import storage
 
-router = APIRouter(prefix="/event-types", tags=["Event Types"])
+router = APIRouter(prefix="/api/event-types", tags=["Event Types"])
 
 
 @router.post("", response_model=EventType, status_code=201)
