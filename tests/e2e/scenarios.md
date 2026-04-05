@@ -1,194 +1,663 @@
 # E2E Test Scenarios — Calendar Booking App
 
 > Integration tests covering end-to-end user journeys via Playwright.
-> Tests verify that frontend and backend work together through the real browser.
+> Each test is **atomic**, **independent**, and follows **Given-When-Then** structure.
+> Tests are designed for automation with Playwright MCP and Chrome DevTools MCP.
 
 ---
 
-## Scenario 1: Full Guest Booking Flow (Critical)
+## Selector Strategy
 
-**Route**: `/` → `/book` → `/book/:eventTypeId` → success
-
-**Description**: A guest books an appointment from start to finish — the primary user journey of the application.
-
-### Steps
-
-1. Open the landing page `/`
-2. Verify the page contains the CTA button "Записаться"
-3. Click "Записаться" → navigate to `/book`
-4. Verify the event types page loads with owner profile and event type cards
-5. Click an event type card (e.g. "Знакомство" or "Консультация") → navigate to `/book/:eventTypeId`
-6. Verify the booking page renders with 3 columns: summary, calendar, slot list
-7. Select a date in the calendar (non-past)
-8. Verify available time slots appear in the slot list
-9. Click a free ("Свободно") time slot
-10. Verify the "Продолжить" button becomes enabled
-11. Click "Продолжить" → booking form appears
-12. Fill in `guestName` (min 2 chars) and `guestEmail` (valid email)
-13. Click "Подтвердить запись"
-14. Verify success message: "Бронь подтверждена. До встречи!"
-15. Click "Забронировать еще" → navigate back to `/book`
-
-### Assertions
-
-- All route transitions occur correctly
-- "Продолжить" button is disabled until a slot is selected
-- Form validation blocks submission with invalid data
-- `POST /api/bookings` returns 201
-- Success screen renders with correct confirmation message
-- "Забронировать еще" navigates to `/book`
+No `data-testid` attributes exist in the codebase. All selectors use:
+- **Roles**: `getByRole('button', { name: '...' })`, `getByRole('textbox', { name: '...' })`
+- **Text content**: `getByText('...')`, `getByRole('heading', { name: '...' })`
+- **Labels**: `getByLabel('...')`
+- **CSS (fallback)**: Mantine class selectors for DatePicker day cells
 
 ---
 
-## Scenario 2: Slot Conflict Handling (High)
+## Test Fixtures (API Helpers)
 
-**Description**: If a slot gets booked by another user while the current user is filling the form, the app detects the conflict and returns the user to the calendar step.
+Each test that needs setup uses API helpers (not other tests) as prerequisites:
 
-### Steps
-
-1. Navigate to `/book/:eventTypeId`
-2. Select a date and a free time slot
-3. Click "Продолжить" to reach the booking form
-4. Fill in name and email
-5. **Before submitting** — use the API to book the same slot (`POST /api/bookings`)
-6. Click "Подтвердить запись"
-7. Verify the user is redirected back to the calendar step
-8. Verify an error message is displayed about the slot being unavailable
-
-### Assertions
-
-- The final availability check detects the conflict
-- `POST /api/bookings` returns 409 `SLOT_ALREADY_BOOKED`
-- User is returned to the calendar step with an error
-- Slot cache is invalidated (the conflicting slot shows as booked)
+| Helper | Method | Purpose |
+|--------|--------|---------|
+| `seedEventTypes()` | `GET /api/event-types` | Ensure default 15/30 min types exist |
+| `createBookingViaAPI(data)` | `POST /api/bookings` | Create a booking without UI |
+| `cancelBookingViaAPI(id)` | `DELETE /api/owner/bookings/{id}` | Clean up a booking |
+| `getEventTypes()` | `GET /api/event-types` | Read event types, return IDs |
+| `getSettings()` | `GET /api/settings` | Read current owner settings |
+| `updateSettingsViaAPI(data)` | `PATCH /api/owner/settings` | Set owner settings before test |
 
 ---
 
-## Scenario 3: Admin — View & Cancel Bookings (High)
+## Tests
 
-**Route**: `/admin`
+### T01 — Landing page renders and navigates to booking
 
-**Description**: The owner views upcoming bookings and cancels one.
+**Priority**: Critical
+**File**: `specs/booking.spec.ts`
 
-### Steps
+```
+Given:  пользователь открывает страницу `/`
+When:   страница загрузилась
+Then:   виден заголовок "Calendar"
+And:    видна кнопка "Записаться"
+And:    виден раздел "Возможности" со списком из 3 пунктов
+```
 
-1. Complete a booking via Scenario 1 (prerequisite)
-2. Navigate to `/admin`
-3. Verify the "Бронирования" tab shows the booking card
-4. Verify the booking card displays: guest name, email, slot time, event type name
-5. Click "Отменить" on the booking card
-6. Verify the booking card is removed from the list
+**Selectors**:
+- `getByRole('heading', { name: 'Calendar', level: 1 })`
+- `getByRole('button', { name: 'Записаться' })`
+- `getByText('Возможности')`
 
-### Assertions
-
-- `GET /api/owner/bookings` returns the booking
-- Booking card renders with correct guest and slot details
-- `DELETE /api/owner/bookings/{id}` returns 204
-- UI updates to reflect the cancellation (booking removed from list)
-
----
-
-## Scenario 4: Admin — Update Owner Settings (Medium)
-
-**Route**: `/admin` → Settings tab
-
-**Description**: The owner updates their profile name and working hours.
-
-### Steps
-
-1. Navigate to `/admin`
-2. Switch to the "Настройки" tab
-3. In the Owner Settings form, change the owner name
-4. Change work day start and/or end times (e.g. `09:00` → `10:00`)
-5. Click "Сохранить"
-6. Verify a success notification appears
-7. Refresh the page
-8. Verify the updated settings persist
-
-### Assertions
-
-- `PATCH /api/owner/settings` returns 200
-- Success feedback is shown in the UI
-- Settings persist after page reload (`GET /api/settings` returns updated values)
+**Chrome DevTools MCP checks**:
+- No console errors
+- No failed network requests
 
 ---
 
-## Scenario 5: Admin — CRUD Event Types (Medium)
+### T02 — Landing page "Записаться" navigates to event types
 
-**Route**: `/admin` → Settings tab → Event Type Manager
+**Priority**: Critical
+**File**: `specs/booking.spec.ts`
 
-**Description**: The owner creates, edits, and deletes event types.
+```
+Given:  пользователь на странице `/`
+When:   нажимает кнопку "Записаться"
+Then:   URL меняется на `/book`
+And:    виден заголовок "Выберите тип события"
+And:    виден OwnerProfile с именем владельца
+And:    видны карточки типов событий (минимум 1)
+```
 
-### Steps
-
-### 5a. Create Event Type
-
-1. Navigate to `/admin`, "Настройки" tab
-2. Click "Создать" to open the creation modal
-3. Fill in name, description, and select duration (15 or 30 min)
-4. Click "Создать" in the modal
-5. Verify the new event type appears in the list
-
-### 5b. Edit Event Type
-
-1. Click "Изменить" on an existing event type
-2. Change the name and/or description inline
-3. Verify the changes are saved and reflected in the UI
-
-### 5c. Delete Event Type
-
-1. Click "Удалить" on an event type
-2. Verify the event type is removed from the list
-
-### 5d. Duplicate Duration Validation
-
-1. Attempt to create a new event type with a duration that already exists
-2. Verify an error is shown (409 `DUPLICATE_DURATION`)
-
-### Assertions
-
-- `POST /api/owner/event-types` creates the type and it appears in the list
-- `PATCH /api/owner/event-types/{id}` updates the type inline
-- `DELETE /api/owner/event-types/{id}` removes the type (204)
-- Creating a type with a duplicate duration returns 409 and shows an error
+**Selectors**:
+- `getByRole('button', { name: 'Записаться' }).click()`
+- `expect(page).toHaveURL(/\/book$/)`
+- `getByRole('heading', { name: 'Выберите тип события', level: 2 })`
 
 ---
 
-## Scenario 6: Booking Form Validation (Medium)
+### T03 — Event types page shows cards and navigates to booking
 
-**Description**: The booking form validates user input before submission.
+**Priority**: Critical
+**File**: `specs/booking.spec.ts`
 
-### Steps
+```
+Given:  пользователь на странице `/book`
+And:    seed data загружен (есть типы событий 15 и 30 мин)
+When:   нажимает на карточку типа события (любую)
+Then:   URL меняется на `/book/{eventTypeId}`
+And:    виден заголовок "Запись на звонок"
+And:    видны 3 колонки: "Календарь", summary, "Статус слотов"
+```
 
-1. Navigate to `/book/:eventTypeId`
-2. Select a date and a free time slot
-3. Click "Продолжить" to reach the booking form
-4. Attempt to submit with empty name → verify error
-5. Enter a 1-character name → verify error (min 2 chars required)
-6. Enter an invalid email (e.g. "abc") → verify error
-7. Enter a valid name (2+ chars) and valid email → verify the "Подтвердить запись" button is enabled
-8. Submit successfully
+**Selectors**:
+- `locator('.mantine-Card-root').first().click()` (first event type card)
+- `expect(page).toHaveURL(/\/book\/.+/)`
+- `getByRole('heading', { name: 'Запись на звонок', level: 2 })`
+- `getByRole('heading', { name: 'Календарь', level: 4 })`
+- `getByRole('heading', { name: 'Статус слотов', level: 4 })`
 
-### Assertions
+---
 
-- Empty name triggers validation error
-- Name shorter than 2 characters triggers validation error
-- Invalid email format triggers validation error
-- Form cannot be submitted with invalid data
-- Valid data enables submission and completes the booking
+### T04 — Calendar date selection loads available slots
+
+**Priority**: High
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на странице `/book/{eventTypeId}`
+When:   выбирает сегодняшнюю дату в календаре
+Then:   в колонке "Статус слотов" появляются кнопки со временем
+And:    каждая кнопка содержит текст "Свободно" или "Занято"
+And:    кнопка "Продолжить" остаётся заблокированной (disabled)
+```
+
+**Selectors**:
+- DatePicker day cell: click button containing today's day number (not disabled)
+- `getByRole('button', { name: /Свободно/ })` — at least one visible
+- `getByRole('button', { name: 'Продолжить' })` — check `disabled` attribute
+
+**Playwright MCP note**: Mantine DatePicker renders day cells as `<button>` elements.
+Select by finding a button containing the day number that is not `aria-disabled`.
+
+---
+
+### T05 — Slot selection enables "Продолжить"
+
+**Priority**: High
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на странице `/book/{eventTypeId}`
+And:    дата выбрана, слоты загружены
+When:   нажимает на первый свободный слот ("Свободно")
+Then:   кнопка "Продолжить" становится активной (не disabled)
+And:    в summary отображается выбранное время в формате "HH:mm - HH:mm"
+```
+
+**Selectors**:
+- `getByRole('button', { name: /Свободно/ }).first().click()`
+- `getByRole('button', { name: 'Продолжить' })` — verify NOT disabled
+- `getByText(/\d{2}:\d{2} - \d{2}:\d{2}/)` — in summary panel
+
+---
+
+### T06 — Booking form validates input
+
+**Priority**: Medium
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на странице `/book/{eventTypeId}`
+And:    дата и слот выбраны
+When:   нажимает "Продолжить"
+Then:   появляется форма с полями "Имя" и "Email"
+And:    кнопка "Подтвердить запись" видна
+```
+
+**Selectors**:
+- `getByRole('button', { name: 'Продолжить' }).click()`
+- `getByRole('textbox', { name: 'Имя' })` — visible
+- `getByRole('textbox', { name: 'Email' })` — visible
+- `getByRole('button', { name: 'Подтвердить запись' })` — visible
+
+---
+
+### T07 — Booking form rejects invalid input
+
+**Priority**: Medium
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на шаге формы бронирования
+When:   вводит 1 символ в поле "Имя"
+And:    вводит "abc" в поле "Email"
+And:    пытается отправить форму (нажимает "Подтвердить запись")
+Then:   видна ошибка "Минимум 2 символа" под полем "Имя"
+And:    видна ошибка "Некорректный email" под полем "Email"
+And:    booking НЕ создан (нет success-экрана)
+```
+
+**Selectors**:
+- `getByRole('textbox', { name: 'Имя' }).fill('А')`
+- `getByRole('textbox', { name: 'Email' }).fill('abc')`
+- `getByRole('button', { name: 'Подтвердить запись' }).click()`
+- `getByText('Минимум 2 символа')` — visible
+- `getByText('Некорректный email')` — visible
+
+---
+
+### T08 — Booking form accepts valid input and shows success
+
+**Priority**: Critical
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на шаге формы бронирования
+And:    слот выбран и свободен
+When:   вводит валидное имя (2+ символа) в поле "Имя"
+And:    вводит валидный email в поле "Email"
+And:    нажимает "Подтвердить запись"
+Then:   виден текст "Бронь подтверждена. До встречи!"
+And:    видна кнопка "Забронировать еще"
+```
+
+**Selectors**:
+- `getByRole('textbox', { name: 'Имя' }).fill('Тест Пользователь')`
+- `getByRole('textbox', { name: 'Email' }).fill('test@example.com')`
+- `getByRole('button', { name: 'Подтвердить запись' }).click()`
+- `getByText('Бронь подтверждена. До встречи!')` — visible
+- `getByRole('button', { name: 'Забронировать еще' })` — visible
+
+**Chrome DevTools MCP checks**:
+- Network tab: `POST /api/bookings` returns 201
+- No console errors
+
+---
+
+### T09 — "Забронировать еще" returns to event types
+
+**Priority**: Medium
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на экране успеха (после успешного бронирования)
+When:   нажимает "Забронировать еще"
+Then:   URL меняется на `/book`
+And:    виден заголовок "Выберите тип события"
+```
+
+**Selectors**:
+- `getByRole('button', { name: 'Забронировать еще' }).click()`
+- `expect(page).toHaveURL(/\/book$/)`
+- `getByRole('heading', { name: 'Выберите тип события', level: 2 })`
+
+---
+
+### T10 — "Назад" returns to event types from calendar
+
+**Priority**: Medium
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на странице `/book/{eventTypeId}` (шаг календаря)
+When:   нажимает "Назад"
+Then:   URL меняется на `/book`
+And:    виден заголовок "Выберите тип события"
+```
+
+**Selectors**:
+- `getByRole('button', { name: 'Назад' }).click()`
+- `expect(page).toHaveURL(/\/book$/)`
+
+---
+
+### T11 — "Изменить" returns to calendar from form
+
+**Priority**: Medium
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на шаге формы бронирования
+When:   нажимает "Изменить"
+Then:   возвращается на шаг календаря (форма скрыта)
+And:    видна кнопка "Продолжить"
+And:    выбранный слот остаётся подсвечен
+```
+
+**Selectors**:
+- `getByRole('button', { name: 'Изменить' }).click()`
+- `getByRole('button', { name: 'Продолжить' })` — visible
+- Form fields "Имя" / "Email" — NOT visible
+
+---
+
+### T12 — Slot conflict: slot taken by another user before confirmation
+
+**Priority**: High
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на странице `/book/{eventTypeId}`
+And:    выбрана дата и свободный слот
+And:    пользователь перешёл на шаг формы
+And:    заполнены валидные имя и email
+When:   тот же слот бронируется через API (`POST /api/bookings`)
+And:    пользователь нажимает "Подтвердить запись"
+Then:   пользователь возвращается на шаг календаря
+And:    видна ошибка "Выбранный слот уже занят. Выберите другое время."
+And:    ранее выбранный слот отображается как "Занято" (disabled)
+```
+
+**Implementation notes** (deterministic, no race condition):
+1. Выбрать дату и слот, перейти к форме, заполнить данные
+2. **Синхронно** вызвать `POST /api/bookings` через API-хелпер с тем же слотом
+3. Дождаться ответа API (201) — слот гарантированно занят
+4. Нажать "Подтвердить запись" в UI
+5. Проверить ошибку
+
+**Chrome DevTools MCP checks**:
+- Network tab: first `POST /api/bookings` (API helper) returns 201
+- Network tab: second `POST /api/bookings` (UI submit) returns 409 `SLOT_ALREADY_BOOKED`
+
+---
+
+### T13 — Admin page shows bookings tab by default
+
+**Priority**: High
+**File**: `specs/admin-bookings.spec.ts`
+
+```
+Given:  через API создано бронирование (`POST /api/bookings`)
+When:   пользователь открывает `/admin`
+Then:   активна вкладка "Бронирования"
+And:    видна карточка бронирования с именем гостя
+And:    видна карточка с email гостя
+And:    видна карточка со временем слота
+And:    видна карточка с типом события
+And:    видна кнопка "Отменить"
+```
+
+**Selectors**:
+- `page.goto('/admin')`
+- `getByRole('tab', { name: 'Бронирования' })` — active/selected
+- `getByText('Тест Пользователь')` — guest name from API-created booking
+- `getByRole('button', { name: 'Отменить' })` — visible
+
+---
+
+### T14 — Admin cancels a booking
+
+**Priority**: High
+**File**: `specs/admin-bookings.spec.ts`
+
+```
+Given:  через API создано бронирование
+And:    пользователь на странице `/admin`
+And:    видна карточка бронирования
+When:   нажимает "Отменить" на карточке
+Then:   карточка бронирования исчезает из списка
+And:    виден текст "Нет предстоящих событий" (если других бронирований нет)
+```
+
+**Selectors**:
+- `getByRole('button', { name: 'Отменить' }).click()`
+- `expect(getByText('Тест Пользователь')).not.toBeVisible()`
+- `getByText('Нет предстоящих событий')` — visible (if no other bookings)
+
+**Chrome DevTools MCP checks**:
+- Network tab: `DELETE /api/owner/bookings/{id}` returns 204
+
+---
+
+### T15 — Admin bookings list is empty when no bookings exist
+
+**Priority**: Low
+**File**: `specs/admin-bookings.spec.ts`
+
+```
+Given:  нет активных бронирований (все отменены через API)
+When:   пользователь открывает `/admin`
+Then:   активна вкладка "Бронирования"
+And:    виден текст "Нет предстоящих событий"
+```
+
+---
+
+### T16 — Admin updates owner settings
+
+**Priority**: Medium
+**File**: `specs/admin-settings.spec.ts`
+
+```
+Given:  пользователь на странице `/admin`
+When:   переключается на вкладку "Настройки"
+And:    меняет имя в поле "Имя" на "Новое Имя"
+And:    меняет "Начало рабочего дня" на "10:00"
+And:    меняет "Конец рабочего дня" на "19:00"
+And:    нажимает "Сохранить"
+Then:   виден текст "Сохранено" (зелёный)
+```
+
+**Selectors**:
+- `page.goto('/admin')`
+- `getByRole('tab', { name: 'Настройки' }).click()`
+- `getByRole('textbox', { name: 'Имя' }).fill('Новое Имя')`
+- `getByRole('textbox', { name: 'Начало рабочего дня' }).fill('10:00')`
+- `getByRole('textbox', { name: 'Конец рабочего дня' }).fill('19:00')`
+- `getByRole('button', { name: 'Сохранить' }).click()`
+- `getByText('Сохранено')` — visible, green color
+
+---
+
+### T17 — Admin settings persist after page reload
+
+**Priority**: Medium
+**File**: `specs/admin-settings.spec.ts`
+
+```
+Given:  настройки владельца обновлены (имя = "Новое Имя", часы = 10:00-19:00)
+When:   пользователь перезагружает страницу `/admin`
+And:    переключается на вкладку "Настройки"
+Then:   поле "Имя" содержит "Новое Имя"
+And:    поле "Начало рабочего дня" содержит "10:00"
+And:    поле "Конец рабочего дня" содержит "19:00"
+```
+
+**Selectors**:
+- `page.reload()`
+- `getByRole('tab', { name: 'Настройки' }).click()`
+- `getByRole('textbox', { name: 'Имя' })` — value is "Новое Имя"
+- `getByRole('textbox', { name: 'Начало рабочего дня' })` — value is "10:00"
+- `getByRole('textbox', { name: 'Конец рабочего дня' })` — value is "19:00"
+
+---
+
+### T18 — Admin settings form validates work hours format
+
+**Priority**: Low
+**File**: `specs/admin-settings.spec.ts`
+
+```
+Given:  пользователь на вкладке "Настройки" в форме настроек
+When:   вводит "99:99" в поле "Начало рабочего дня"
+And:    нажимает "Сохранить"
+Then:   видна ошибка валидации (форма не отправлена)
+```
+
+---
+
+### T19 — Admin creates a new event type
+
+**Priority**: Medium
+**File**: `specs/admin-event-types.spec.ts`
+
+```
+Given:  пользователь на вкладке "Настройки"
+And:    секция "Типы событий" видна
+When:   нажимает "Создать"
+Then:   открывается модалка "Новый тип события"
+And:    видны поля "Название", "Описание", "Длительность"
+And:    видна кнопка "Создать" в модалке
+```
+
+**Selectors**:
+- `getByRole('tab', { name: 'Настройки' }).click()`
+- `getByText('Типы событий')` — visible
+- `getByRole('button', { name: 'Создать' }).click()`
+- `getByRole('heading', { name: 'Новый тип события', level: 2 })` — or modal title
+- `getByRole('textbox', { name: 'Название' })` — visible
+- `getByRole('textbox', { name: 'Описание' })` — visible
+- `getByRole('combobox', { name: 'Длительность' })` — visible (Mantine Select)
+
+---
+
+### T20 — Admin successfully creates event type via modal
+
+**Priority**: Medium
+**File**: `specs/admin-event-types.spec.ts`
+
+```
+Given:  модалка "Новый тип события" открыта
+When:   вводит "Тестовая встреча" в поле "Название"
+And:    вводит "Описание тестовой встречи" в поле "Описание"
+And:    выбирает "15 минут" в поле "Длительность"
+And:    нажимает "Создать" в модалке
+Then:   модалка закрывается
+And:    в списке появляется "Тестовая встреча"
+And:    видна длительность "15 мин"
+```
+
+**Selectors**:
+- `getByRole('textbox', { name: 'Название' }).fill('Тестовая встреча')`
+- `getByRole('textbox', { name: 'Описание' }).fill('Описание тестовой встречи')`
+- Select duration: click combobox, then click option "15 минут"
+- `getByRole('button', { name: 'Создать' }).click()` (inside modal)
+- `getByText('Тестовая встреча')` — visible in list
+- `getByText('15 мин')` — visible
+
+---
+
+### T21 — Admin edits an event type inline
+
+**Priority**: Medium
+**File**: `specs/admin-event-types.spec.ts`
+
+```
+Given:  в списке типов событий есть элемент с кнопкой "Изменить"
+When:   нажимает "Изменить" на первом типе события
+Then:   поля "Название" и "Описание" становятся редактируемыми
+And:    видна кнопка "Сохранить"
+And:    видна кнопка "Отмена"
+```
+
+**Selectors**:
+- `getByRole('button', { name: 'Изменить' }).first().click()`
+- `getByRole('textbox', { name: 'Название' })` — visible (edit mode)
+- `getByRole('button', { name: 'Сохранить' })` — visible
+- `getByRole('button', { name: 'Отмена' })` — visible
+
+---
+
+### T22 — Admin saves edited event type
+
+**Priority**: Medium
+**File**: `specs/admin-event-types.spec.ts`
+
+```
+Given:  тип события в режиме редактирования
+When:   меняет название на "Обновлённое название"
+And:    нажимает "Сохранить"
+Then:   режим редактирования закрывается
+And:    в списке видно "Обновлённое название"
+```
+
+---
+
+### T23 — Admin deletes an event type
+
+**Priority**: Medium
+**File**: `specs/admin-event-types.spec.ts`
+
+```
+Given:  в списке типов событий есть хотя бы 2 элемента
+When:   нажимает "Удалить" на последнем типе события
+Then:   этот тип события исчезает из списка
+```
+
+**Note**: Удалять можно только если тип не последний (бэкенд требует минимум 1 тип).
+Тест должен проверять наличие 2+ типов перед удалением.
+
+---
+
+### T24 — Admin cannot create event type with duplicate duration
+
+**Priority**: Medium
+**File**: `specs/admin-event-types.spec.ts`
+
+```
+Given:  уже существует тип события с длительностью 15 минут
+And:    модалка "Новый тип события" открыта
+When:   заполняет форму и выбирает "15 минут" в поле "Длительность"
+And:    нажимает "Создать"
+Then:   модалка НЕ закрывается
+And:    видна ошибка (сообщение об ошибке от API)
+```
+
+**Chrome DevTools MCP checks**:
+- Network tab: `POST /api/owner/event-types` returns 409 `DUPLICATE_DURATION`
+
+---
+
+### T25 — Header navigation works from all pages
+
+**Priority**: Low
+**File**: `specs/navigation.spec.ts`
+
+```
+Given:  пользователь на странице `/`
+When:   нажимает "Предстоящие события" в хедере
+Then:   URL меняется на `/admin`
+```
+
+```
+Given:  пользователь на странице `/admin`
+When:   нажимает "Записаться" в хедере
+Then:   URL меняется на `/book`
+```
+
+```
+Given:  пользователь на странице `/book`
+When:   нажимает "Calendar" в хедере
+Then:   URL меняется на `/`
+```
+
+---
+
+### T26 — Past dates are disabled in calendar
+
+**Priority**: Low
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  пользователь на странице `/book/{eventTypeId}`
+When:   открывает предыдущий месяц в календаре (кнопка "Previous month")
+Then:   все дни предыдущего месяца заблокированы (disabled)
+And:    невозможно кликнуть на прошедшую дату
+```
+
+**Selectors**:
+- DatePicker: click "Previous month" button (aria-label)
+- Day cells from past month: verify `aria-disabled="true"` or `disabled` attribute
+
+---
+
+### T27 — Booked slots are disabled in slot list
+
+**Priority**: High
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  через API создано бронирование на конкретный слот
+When:   пользователь выбирает дату этого бронирования в календаре
+Then:   в списке слотов забронированный слот отображается как "Занято"
+And:    кнопка "Занято" заблокирована (disabled)
+And:    невозможно выбрать забронированный слот
+```
+
+**Selectors**:
+- `getByRole('button', { name: /Занято/ })` — visible
+- Verify the "Занято" button has `disabled` attribute
+
+---
+
+### T28 — Empty event types page shows appropriate message
+
+**Priority**: Low
+**File**: `specs/booking.spec.ts`
+
+```
+Given:  все типы событий удалены через API (или список пуст)
+When:   пользователь открывает `/book`
+Then:   виден текст "Нет доступных типов событий"
+```
 
 ---
 
 ## Priority Summary
 
-| # | Scenario | Priority |
-|---|----------|----------|
-| 1 | Full Guest Booking Flow | **Critical** |
-| 2 | Slot Conflict Handling | High |
-| 3 | Admin — View & Cancel Bookings | High |
-| 4 | Admin — Update Owner Settings | Medium |
-| 5 | Admin — CRUD Event Types | Medium |
-| 6 | Booking Form Validation | Medium |
+| ID | Test | Priority | File |
+|----|------|----------|------|
+| T01 | Landing page renders | **Critical** | booking |
+| T02 | "Записаться" navigates to `/book` | **Critical** | booking |
+| T03 | Event type card navigates to booking | **Critical** | booking |
+| T04 | Calendar date selection loads slots | High | booking |
+| T05 | Slot selection enables "Продолжить" | High | booking |
+| T06 | Booking form appears | Medium | booking |
+| T07 | Form rejects invalid input | Medium | booking |
+| T08 | Form accepts valid input, shows success | **Critical** | booking |
+| T09 | "Забронировать еще" returns to `/book` | Medium | booking |
+| T10 | "Назад" returns to `/book` | Medium | booking |
+| T11 | "Изменить" returns to calendar | Medium | booking |
+| T12 | Slot conflict handling | High | booking |
+| T13 | Admin shows bookings | High | admin-bookings |
+| T14 | Admin cancels booking | High | admin-bookings |
+| T15 | Admin empty bookings list | Low | admin-bookings |
+| T16 | Admin updates settings | Medium | admin-settings |
+| T17 | Settings persist after reload | Medium | admin-settings |
+| T18 | Settings work hours validation | Low | admin-settings |
+| T19 | Admin opens create event type modal | Medium | admin-event-types |
+| T20 | Admin creates event type | Medium | admin-event-types |
+| T21 | Admin enters edit mode | Medium | admin-event-types |
+| T22 | Admin saves edited event type | Medium | admin-event-types |
+| T23 | Admin deletes event type | Medium | admin-event-types |
+| T24 | Duplicate duration error | Medium | admin-event-types |
+| T25 | Header navigation | Low | navigation |
+| T26 | Past dates disabled | Low | booking |
+| T27 | Booked slots disabled | High | booking |
+| T28 | Empty event types message | Low | booking |
 
 ---
 
@@ -198,18 +667,29 @@
 - Frontend running on `http://localhost:5173`
 - Seed data loaded (default event types: 15min and 30min)
 - Tests run against the real application (not mocked)
+- Each test manages its own state via API helpers — no inter-test dependencies
 
-## Test Structure Plan
+## Test File Structure
 
 ```
 tests/e2e/
-├── scenarios.md              # This file
+├── scenarios.md                  # This file
 ├── fixtures/
-│   └── test-setup.ts         # Shared fixtures (page, API helpers, seed data)
+│   └── test-setup.ts             # API helpers, page fixtures, seed management
 ├── specs/
-│   ├── booking.spec.ts       # Scenario 1 + 2 + 6
-│   ├── admin-bookings.spec.ts # Scenario 3
-│   ├── admin-settings.spec.ts # Scenario 4
-│   └── admin-event-types.spec.ts # Scenario 5
-└── playwright.config.ts      # Playwright configuration
+│   ├── booking.spec.ts           # T01-T12, T26-T28
+│   ├── admin-bookings.spec.ts    # T13-T15
+│   ├── admin-settings.spec.ts    # T16-T18
+│   ├── admin-event-types.spec.ts # T19-T24
+│   └── navigation.spec.ts        # T25
+└── playwright.config.ts          # Playwright configuration
 ```
+
+## Design Principles Applied
+
+1. **Atomicity**: Each test verifies exactly one behavior. One reason to fail.
+2. **Independence**: No test depends on another. Prerequisites are set up via API helpers.
+3. **Determinism**: No race conditions. API calls complete before UI actions.
+4. **Given-When-Then**: Every test has explicit preconditions, actions, and verifications.
+5. **Observable behavior**: Tests verify what the user sees, not internal state.
+6. **Selector stability**: Uses roles and labels (accessible selectors), not CSS classes where possible.
