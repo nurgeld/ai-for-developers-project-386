@@ -4,8 +4,7 @@ help:
 	@echo "  make dev-mock       - Start with mock API (Prism)"
 	@echo "  make build          - Build for production"
 	@echo "  make lint           - Run ESLint"
-	@echo "  make test           - Run tests (requires setup)"
-	@echo "  make test-watch     - Run tests in watch mode"
+	@echo "  make test-backend   - Run backend pytest"
 	@echo "  make mock-api       - Start Prism mock server"
 	@echo "  make compile-api    - Compile TypeSpec to OpenAPI"
 	@echo "  make generate-types - Generate TS types from OpenAPI"
@@ -61,10 +60,8 @@ build:
 	npm run build
 lint:
 	npm run lint
-test:
-	npm test
-test-watch:
-	npm run test:watch
+test-backend:
+	cd backend && poetry run pytest
 mock-api:
 	npm run mock:api
 compile-api:

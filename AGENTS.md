@@ -17,6 +17,7 @@ make restart         # Start backend (8000) + frontend (5173)
 make dev             # Frontend dev server
 make build           # TS compile + Vite build
 make lint            # ESLint
+make test-backend    # Run backend pytest
 make compile-api     # TypeSpec → OpenAPI
 make generate-types  # OpenAPI → TS types
 ```
@@ -110,10 +111,15 @@ src/
 ├── App.tsx           # MantineProvider + QueryClient + RouterProvider
 └── main.tsx
 backend/app/
-├── main.py           # FastAPI entry point
-├── models.py         # Pydantic models
+├── main.py           # FastAPI app factory (create_app)
+├── models.py         # Pydantic request/response models
 ├── storage.py        # In-memory storage with seed data
-└── routers/          # settings, event_types, slots, bookings, owner_settings
+├── dependencies.py   # FastAPI DI (get_storage)
+├── errors.py         # Unified error handling
+├── services.py       # Business logic layer
+├── time_utils.py     # Time parsing and UTC utilities
+├── routers/          # settings, event_types, slots, bookings, owner_settings
+└── tests/            # pytest: conftest.py, test_services.py, test_api.py
 .opencode/tools/
 ├── seed-test-data.ts # Custom tool for test data
 └── run-seed.js       # Standalone seed script

@@ -6,28 +6,31 @@ A calendar-based booking application for event scheduling. The system supports t
 
 **Calendar Owner** can:
 - Create event types (e.g., "Знакомство" — 15 min, "Консультация" — 30 min)
+- Update and delete event types
 - View upcoming bookings across all event types
-- Configure availability: days of the week and time ranges (e.g., 9:00–12:00, 14:00–19:00)
-- Filter bookings by event type, date range, and status
+- Configure work hours (e.g., 09:00–18:00)
+- Cancel bookings
 
 **Guests** can:
 - Browse available event types with name, description, and duration
-- View a calendar with available (gray), booked (red), and personal (green) slots
-- Book a free slot by providing name, email, and optional comment (max 500 chars)
-- Navigate the calendar up to 4 weeks ahead (day or week view)
+- View a calendar with available and booked slots
+- Book a free slot by providing name and email
 
 ## Key Rules
 
 - **No overlap**: Two bookings cannot occupy the same time slot, even for different event types
-- **Buffer time**: After a 30-minute booking, subsequent free slots shift forward by +10 minutes
-- **No registration**: Guests book without creating an account; personal slot highlighting is managed via cookies on the frontend
-- **Slot generation**: Slots are generated as a 30-minute grid within configured availability periods, spanning 4 weeks ahead
+- **Slot grid**: Slots are generated on a 15 or 30 minute grid based on the event type duration
+- **Work hours**: Slots only appear within configured `workDayStart`–`workDayEnd`
+- **Future only**: Only future slots are returned to guests
+- **No registration**: Guests book without creating an account
+- **Orphan bookings**: Deleting an event type does not delete existing bookings of that type
 
 ## Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Mantine UI, React Router
-- **Backend**: Python, FastAPI, Pydantic, Poetry
+- **Frontend**: React 19, TypeScript, Vite, Mantine UI, TanStack Router, TanStack Query
+- **Backend**: Python 3.12, FastAPI, Pydantic, Poetry
 - **API Contract**: TypeSpec (`api/main.tsp`)
+- **Testing**: pytest
 
 ## Getting Started
 
@@ -50,6 +53,13 @@ poetry install
 poetry run uvicorn app.main:app --reload
 ```
 
+### Backend Tests
+
+```bash
+cd backend
+poetry run pytest
+```
+
 ### Using Makefile
 
 ```bash
@@ -60,7 +70,7 @@ make mock-api        # Start Prism mock server only
 
 ## API
 
-The API contract is defined in `api/main.tsp` using TypeSpec.
+The API contract is defined in `api/main.tsp` using TypeSpec and is the **single source of truth** for all endpoints.
 
 ### Workflow
 
@@ -68,36 +78,87 @@ The API contract is defined in `api/main.tsp` using TypeSpec.
 2. Run `npm run compile:api` to generate OpenAPI spec
 3. Run `npm run generate:types` to generate TypeScript types in `src/api/generated.ts`
 
-### Endpoints
+### Public Endpoints (`/api`)
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/api/event-types` | Create an event type (15 or 30 min only) |
-| GET | `/api/event-types` | List all event types |
-| GET | `/api/slots` | List available and booked slots |
-| POST | `/api/bookings` | Create a booking (sets `guest_email` cookie) |
-| GET | `/api/bookings` | List bookings with filters (`eventTypeId`, `start`, `end`, `guestEmail`, `status`) |
-| POST | `/api/availability` | Create an availability period |
-| GET | `/api/availability` | List availability periods |
-| DELETE | `/api/availability/{id}` | Delete an availability period |
+| GET | `/settings` | Get owner profile (name, avatar, work hours) |
+| GET | `/event-types` | List all event types |
+| GET | `/slots?eventTypeId=&startDate=&endDate=` | List available and booked slots |
+| POST | `/bookings` | Create a booking |
 
-### Guest Identification
+### Owner Endpoints (`/api/owner`)
 
-On successful booking, the server sets a `guest_email` cookie. The frontend uses this to highlight "my bookings" in green by comparing `slot.guestEmail` with the cookie value.
+| Method | Route | Description |
+|--------|-------|-------------|
+| PATCH | `/settings` | Update owner settings |
+| POST | `/event-types` | Create event type (15 or 30 min only) |
+| PATCH | `/event-types/{id}` | Update event type (name, description only) |
+| DELETE | `/event-types/{id}` | Delete event type (204) |
+| GET | `/bookings` | List bookings (future only, sorted ASC) |
+| DELETE | `/bookings/{id}` | Cancel booking (204) |
+
+### Error Responses
+
+| Status | Error Code | Description |
+|--------|-----------|-------------|
+| 400 | `INVALID_SLOT_TIME` | Slot time doesn't match grid or is outside work hours |
+| 400 | `VALIDATION_ERROR` | Request validation failed |
+| 404 | `NOT_FOUND` | Resource not found |
+| 409 | `SLOT_ALREADY_BOOKED` | Slot overlaps with existing booking |
+| 409 | `DUPLICATE_DURATION` | Event type with this duration already exists |
+
+## Backend Architecture
+
+The backend follows a layered architecture with clear separation of concerns:
+
+```
+backend/app/
+├── main.py            # FastAPI app factory (create_app)
+├── models.py          # Pydantic request/response models
+├── storage.py         # In-memory storage with seed data
+├── dependencies.py    # FastAPI dependency injection (get_storage)
+├── errors.py          # Unified error handling and exception types
+├── services.py        # Business logic (validation, slot generation, booking rules)
+├── time_utils.py      # Time parsing and UTC utilities
+└── routers/           # HTTP route handlers (thin layer)
+    ├── settings.py
+    ├── event_types.py
+    ├── slots.py
+    ├── bookings.py
+    └── owner_settings.py
+```
+
+- **Routers** handle HTTP concerns only (parsing, status codes, response models)
+- **Services** contain all business rules and validation
+- **Storage** is injected via `Depends(get_storage)`, making it easy to substitute in tests
+- **Errors** are unified through `ApiException` and mapped to contract-compliant responses
 
 ## Project Structure
 
 ```
 src/
-├── api/          # API client and types
+├── api/          # API client, types, and OpenAPI spec
 ├── components/   # Reusable UI components
 ├── hooks/        # Custom React hooks
 ├── pages/        # Page components (route components)
-└── utils/        # Utility functions
+└── router.tsx    # TanStack Router
 
 backend/
-└── app/
-    ├── main.py       # FastAPI application entry point
-    ├── models.py     # Pydantic models
-    └── routers/      # API route handlers
+├── app/          # FastAPI application
+│   ├── main.py
+│   ├── models.py
+│   ├── storage.py
+│   ├── dependencies.py
+│   ├── errors.py
+│   ├── services.py
+│   ├── time_utils.py
+│   └── routers/
+└── tests/        # Backend tests
+    ├── conftest.py
+    ├── test_services.py
+    └── test_api.py
+
+api/
+└── main.tsp      # TypeSpec API contract (source of truth)
 ```
