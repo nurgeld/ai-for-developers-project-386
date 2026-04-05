@@ -54,6 +54,7 @@ test('T18 rejects invalid work hours on save', async ({ page }) => {
   await page.getByRole('button', { name: 'Сохранить' }).click();
 
   await expect((await saveResponse).status()).toBe(400);
-  await expect(page.getByText('Ошибка сохранения')).toBeVisible();
+  await expect(page.getByText('Request validation failed')).toBeVisible();
+  await expect(page.getByText('body.workDayStart: Value error, time must use HH:mm format')).toBeVisible();
   await expect(page.getByText('Сохранено')).toHaveCount(0);
 });
