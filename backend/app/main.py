@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import event_types, slots, bookings, availability
+from app.routers import settings, event_types, slots, bookings, owner_settings
 
-app = FastAPI(title="Booking API")
+app = FastAPI(title="Calendar Booking API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,7 +12,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(settings.router)
 app.include_router(event_types.router)
+app.include_router(event_types.router_owner)
 app.include_router(slots.router)
 app.include_router(bookings.router)
-app.include_router(availability.router)
+app.include_router(bookings.router_owner)
+app.include_router(owner_settings.router)

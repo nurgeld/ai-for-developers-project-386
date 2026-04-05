@@ -83,7 +83,7 @@ paths:
       description: |-
         Получить список бронирований (с фильтрами).
 
-        Без фильтров: возвращаются только будущие бронирования (startAt >= now()),
+        Без фильтров: возвращаются бронирования за сегодня и будущие (startAt >= startOfToday),
         отсортированные по startAt ASC.
 
         Возвращает все бронирования, включая orphan (с удалёнными типами событий).
@@ -164,6 +164,44 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateEventTypeRequest'
   /api/owner/event-types/{id}:
+    patch:
+      operationId: OwnerAPI_updateEventType
+      description: |-
+        Обновить тип события (частичное обновление).
+        Длительность изменить нельзя после создания.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The request has succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventType'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '404':
+          description: 'Ошибка: ресурс не найден'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundError'
+      tags:
+        - Owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventTypeRequest'
     delete:
       operationId: OwnerAPI_deleteEventType
       description: |-
@@ -227,6 +265,8 @@ paths:
       operationId: PublicAPI_listSlots
       description: |-
         Получить слоты за период для выбранного типа события
+
+        Возвращает только будущие слоты (startAt > now()).
 
         Используется дважды:
         - С диапазоном на весь видимый месяц (например, 2026-03-01..2026-03-31) — для отображения 
@@ -519,6 +559,16 @@ components:
             Занят ли слот любым бронированием.
             Только факт занятости. В PublicAPI данные о госте не возвращаются никогда.
       description: Слот для бронирования — временное окно для конкретного типа события
+    UpdateEventTypeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      description: |-
+        Запрос на обновление типа события (частичное обновление).
+        Длительность изменить нельзя — только name и description.
     UpdateOwnerSettingsRequest:
       type: object
       properties:

@@ -59,7 +59,7 @@ export interface paths {
         /**
          * @description Получить список бронирований (с фильтрами).
          *
-         *     Без фильтров: возвращаются только будущие бронирования (startAt >= now()),
+         *     Без фильтров: возвращаются бронирования за сегодня и будущие (startAt >= startOfToday),
          *     отсортированные по startAt ASC.
          *
          *     Возвращает все бронирования, включая orphan (с удалёнными типами событий).
@@ -135,7 +135,11 @@ export interface paths {
         delete: operations["OwnerAPI_deleteEventType"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * @description Обновить тип события (частичное обновление).
+         *     Длительность изменить нельзя после создания.
+         */
+        patch: operations["OwnerAPI_updateEventType"];
         trace?: never;
     };
     "/api/owner/settings": {
@@ -181,6 +185,8 @@ export interface paths {
         };
         /**
          * @description Получить слоты за период для выбранного типа события
+         *
+         *     Возвращает только будущие слоты (startAt > now()).
          *
          *     Используется дважды:
          *     - С диапазоном на весь видимый месяц (например, 2026-03-01..2026-03-31) — для отображения
@@ -339,6 +345,14 @@ export interface components {
              *     Только факт занятости. В PublicAPI данные о госте не возвращаются никогда.
              */
             isBooked: boolean;
+        };
+        /**
+         * @description Запрос на обновление типа события (частичное обновление).
+         *     Длительность изменить нельзя — только name и description.
+         */
+        UpdateEventTypeRequest: {
+            name?: string;
+            description?: string;
         };
         /** @description Запрос на обновление настроек владельца */
         UpdateOwnerSettingsRequest: {
@@ -562,6 +576,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Ошибка: ресурс не найден */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotFoundError"];
+                };
+            };
+        };
+    };
+    OwnerAPI_updateEventType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEventTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description The request has succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventType"];
+                };
+            };
+            /** @description Ошибка валидации */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError"];
+                };
             };
             /** @description Ошибка: ресурс не найден */
             404: {

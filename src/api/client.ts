@@ -2,125 +2,163 @@ import type {
   EventType,
   Slot,
   Booking,
-  AvailabilityPeriod,
-  CreateEventTypeRequest,
+  OwnerSettings,
   CreateBookingRequest,
-  CreateAvailabilityRequest,
+  CreateEventTypeRequest,
+  UpdateEventTypeRequest,
+  UpdateOwnerSettingsRequest,
 } from './types';
 
 const BASE = '/api';
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
+export class ApiError extends Error {
+  status: number;
+  data: unknown;
+
+  constructor(message: string, status: number, data: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
+async function request<T>(
+  path: string,
+  options?: {
+    method?: string;
+    params?: Record<string, string | undefined>;
+    body?: unknown;
+  },
+): Promise<T> {
+  const { method = 'GET', params, body } = options ?? {};
+
+  let url = `${BASE}${path}`;
+
+  if (params) {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) {
+        searchParams.set(key, value);
+      }
+    }
+    const qs = searchParams.toString();
+    if (qs) url = `${url}?${qs}`;
+  }
+
   const response = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    ...options,
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (response.status === 409) {
-    throw new Error('Slot is already booked. Please select another time.');
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || response.statusText);
+    let errorData: unknown = null;
+    try {
+      errorData = await response.json();
+    } catch {
+      // not JSON
+    }
+    const message =
+      (errorData as { message?: string })?.message ?? `HTTP ${response.status}`;
+    throw new ApiError(message, response.status, errorData);
   }
 
-  if (response.status === 204) return undefined as T;
-  return response.json();
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (!contentType.includes('application/json')) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text) as T;
 }
 
-export class ApiClient {
-  // Event Types
-  async listEventTypes(): Promise<EventType[]> {
-    return request<EventType[]>(`${BASE}/event-types`);
-  }
+// ==================== Public API ====================
 
-  async createEventType(body: CreateEventTypeRequest): Promise<EventType> {
-    return request<EventType>(`${BASE}/event-types`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  }
-
-  // Slots
-  async listSlots(params?: { eventTypeId?: string; start?: string; end?: string }): Promise<Slot[]> {
-    const qs = new URLSearchParams();
-    if (params?.eventTypeId) qs.set('eventTypeId', params.eventTypeId);
-    if (params?.start) qs.set('start', params.start);
-    if (params?.end) qs.set('end', params.end);
-    const query = qs.toString();
-    return request<Slot[]>(`${BASE}/slots${query ? `?${query}` : ''}`);
-  }
-
-  // Bookings
-  async listBookings(params?: {
-    eventTypeId?: string;
-    start?: string;
-    end?: string;
-    guestEmail?: string;
-    status?: string;
-  }): Promise<Booking[]> {
-    const qs = new URLSearchParams();
-    if (params?.eventTypeId) qs.set('eventTypeId', params.eventTypeId);
-    if (params?.start) qs.set('start', params.start);
-    if (params?.end) qs.set('end', params.end);
-    if (params?.guestEmail) qs.set('guestEmail', params.guestEmail);
-    if (params?.status) qs.set('status', params.status);
-    const query = qs.toString();
-    return request<Booking[]>(`${BASE}/bookings${query ? `?${query}` : ''}`);
-  }
-
-  async createBooking(body: CreateBookingRequest): Promise<Booking> {
-    return request<Booking>(`${BASE}/bookings`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  }
-
-  // Availability
-  async listAvailability(): Promise<AvailabilityPeriod[]> {
-    return request<AvailabilityPeriod[]>(`${BASE}/availability`);
-  }
-
-  async createAvailability(body: CreateAvailabilityRequest): Promise<AvailabilityPeriod> {
-    return request<AvailabilityPeriod>(`${BASE}/availability`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  }
-
-  async deleteAvailability(id: string): Promise<void> {
-    return request<void>(`${BASE}/availability/${id}`, {
-      method: 'DELETE',
-    });
-  }
+export function getSettings(): Promise<OwnerSettings> {
+  return request('/settings');
 }
 
-// Create instance for backward compatibility
-const apiInstance = new ApiClient();
+export function listEventTypes(): Promise<EventType[]> {
+  return request('/event-types');
+}
 
-// Export both the class instance and a backward-compatible object
-export const api = {
-  eventTypes: {
-    list: () => apiInstance.listEventTypes(),
-    create: (body: CreateEventTypeRequest) => apiInstance.createEventType(body),
-  },
-  slots: {
-    list: (params?: { eventTypeId?: string; start?: string; end?: string }) => 
-      apiInstance.listSlots(params),
-  },
-  bookings: {
-    list: (params?: { eventTypeId?: string; start?: string; end?: string; guestEmail?: string; status?: string }) => 
-      apiInstance.listBookings(params),
-    create: (body: CreateBookingRequest) => apiInstance.createBooking(body),
-  },
-  availability: {
-    list: () => apiInstance.listAvailability(),
-    create: (body: CreateAvailabilityRequest) => apiInstance.createAvailability(body),
-    delete: (id: string) => apiInstance.deleteAvailability(id),
-  },
-};
+export interface ListSlotsParams {
+  eventTypeId: string;
+  startDate: string;
+  endDate: string;
+}
 
-// Also export the class instance for use with services
-export const apiClient = apiInstance;
+export function listSlots(params: ListSlotsParams): Promise<Slot[]> {
+  return request('/slots', {
+    params: {
+      eventTypeId: params.eventTypeId,
+      startDate: params.startDate,
+      endDate: params.endDate,
+    },
+  });
+}
+
+export function createBooking(body: CreateBookingRequest): Promise<Booking> {
+  return request('/bookings', { method: 'POST', body });
+}
+
+// ==================== Owner API ====================
+
+export function updateSettings(
+  body: UpdateOwnerSettingsRequest,
+): Promise<OwnerSettings> {
+  return request('/owner/settings', { method: 'PATCH', body });
+}
+
+export function createEventType(
+  body: CreateEventTypeRequest,
+): Promise<EventType> {
+  return request('/owner/event-types', { method: 'POST', body });
+}
+
+export function updateEventType(
+  id: string,
+  body: UpdateEventTypeRequest,
+): Promise<EventType> {
+  return request(`/owner/event-types/${id}`, { method: 'PATCH', body });
+}
+
+export function deleteEventType(id: string): Promise<void> {
+  return request(`/owner/event-types/${id}`, { method: 'DELETE' });
+}
+
+export interface ListBookingsParams {
+  eventTypeId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export function listBookings(params?: ListBookingsParams): Promise<Booking[]> {
+  return request('/owner/bookings', {
+    params: params
+      ? {
+          eventTypeId: params.eventTypeId,
+          startDate: params.startDate,
+          endDate: params.endDate,
+        }
+      : undefined,
+  });
+}
+
+export function cancelBooking(id: string): Promise<void> {
+  return request(`/owner/bookings/${id}`, { method: 'DELETE' });
+}

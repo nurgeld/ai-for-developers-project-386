@@ -1,0 +1,349 @@
+import { useState, useMemo, useCallback } from 'react';
+import {
+  Container,
+  Grid,
+  Title,
+  Text,
+  Paper,
+  Stack,
+  Group,
+  Button,
+  Loader,
+  Center,
+  ScrollArea,
+} from '@mantine/core';
+import { useNavigate } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { useOwnerSettings } from '../hooks/useOwnerSettings';
+import { useEventTypes } from '../hooks/useEventTypes';
+import { useSlots } from '../hooks/useSlots';
+import { useCreateBooking } from '../hooks/useCreateBooking';
+import { BookingSummary } from '../components/booking/BookingSummary';
+import { SlotCalendar } from '../components/booking/SlotCalendar';
+import { SlotList } from '../components/booking/SlotList';
+import { BookingForm } from '../components/booking/BookingForm';
+import { BookingSuccess } from '../components/booking/BookingSuccess';
+import { ApiError } from '../api/client';
+import type { Slot } from '../api/types';
+import { dayjs } from '../lib/dayjs';
+
+type Step = 'calendar' | 'form' | 'success';
+
+interface BookingPageProps {
+  eventTypeId: string;
+}
+
+export function BookingPage({ eventTypeId }: BookingPageProps) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { data: settings, isLoading: settingsLoading } = useOwnerSettings();
+  const { data: eventTypes, isLoading: typesLoading } = useEventTypes();
+
+  const eventType = eventTypes?.find((et) => et.id === eventTypeId);
+
+  const [step, setStep] = useState<Step>('calendar');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(dayjs().startOf('month').toDate());
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  const createBooking = useCreateBooking();
+
+  // Month range for slot counters
+  const monthStart = dayjs(currentMonth).startOf('month').format('YYYY-MM-DD');
+  const monthEnd = dayjs(currentMonth).endOf('month').format('YYYY-MM-DD');
+
+  // Day range for slot list
+  const dayStr = selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : '';
+
+  const { data: monthSlots } = useSlots(eventTypeId, monthStart, monthEnd);
+  const {
+    data: daySlots,
+    refetch: refetchDaySlots,
+  } = useSlots(
+    eventTypeId,
+    dayStr,
+    dayStr,
+  );
+
+  const visibleDaySlots = useMemo(() => {
+    if (!selectedDate || !daySlots) return [];
+
+    const selectedDay = dayjs(selectedDate).format('YYYY-MM-DD');
+    const now = dayjs();
+
+    return daySlots.filter(
+      (slot) => {
+        if (dayjs.utc(slot.startAt).format('YYYY-MM-DD') !== selectedDay) {
+          return false;
+        }
+        return dayjs.utc(slot.startAt).isAfter(now);
+      },
+    );
+  }, [daySlots, selectedDate]);
+
+  const freeCount = useMemo(() => {
+    return visibleDaySlots.filter((slot) => !slot.isBooked).length;
+  }, [visibleDaySlots]);
+
+  const totalCount = visibleDaySlots.length;
+
+  const calendarSelectedSlot = useMemo(() => {
+    if (!selectedSlot) {
+      return null;
+    }
+
+    const slotStillAvailable = visibleDaySlots.find(
+      (slot) => slot.startAt === selectedSlot.startAt && !slot.isBooked,
+    );
+
+    if (!slotStillAvailable) {
+      return null;
+    }
+
+    return selectedSlot;
+  }, [visibleDaySlots, selectedSlot]);
+
+  const handleSlotSelect = useCallback((slot: Slot) => {
+    if (!slot.isBooked) {
+      setBookingError(null);
+      setSelectedSlot(slot);
+    }
+  }, []);
+
+  const handleContinue = useCallback(async () => {
+    if (!calendarSelectedSlot || !selectedDate || !selectedSlot) {
+      return;
+    }
+
+    setBookingError(null);
+
+    let fetched;
+
+    try {
+      fetched = await refetchDaySlots();
+    } catch {
+      setBookingError('Не удалось обновить доступные слоты. Попробуйте еще раз.');
+      return;
+    }
+
+    const latestSlots = fetched.data ?? daySlots ?? [];
+    const selectedDay = dayjs(selectedDate).format('YYYY-MM-DD');
+    const latestDaySlots = latestSlots.filter(
+      (slot) => dayjs.utc(slot.startAt).format('YYYY-MM-DD') === selectedDay,
+    );
+
+    const stillFree = latestDaySlots.some(
+      (slot) => slot.startAt === selectedSlot.startAt && !slot.isBooked,
+    );
+
+    if (!stillFree) {
+      setSelectedSlot(null);
+      setBookingError('Выбранный слот уже занят. Выберите другое время.');
+      return;
+    }
+
+    setStep('form');
+  }, [calendarSelectedSlot, daySlots, refetchDaySlots, selectedDate, selectedSlot]);
+
+  const handleBack = useCallback(() => {
+    setStep('calendar');
+    setBookingError(null);
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (values: { guestName: string; guestEmail: string }) => {
+      if (!selectedSlot || !selectedDate) {
+        return;
+      }
+
+      setBookingError(null);
+
+      let latest;
+
+      try {
+        latest = (await refetchDaySlots()).data;
+      } catch {
+        setBookingError('Не удалось проверить доступность слота. Попробуйте еще раз.');
+        return;
+      }
+
+      const latestList = latest ?? daySlots ?? [];
+      const selectedDay = dayjs(selectedDate).format('YYYY-MM-DD');
+      const latestDaySlots = latestList.filter(
+        (slot) => dayjs.utc(slot.startAt).format('YYYY-MM-DD') === selectedDay,
+      );
+      const liveSlot = latestDaySlots.find(
+        (slot) => slot.startAt === selectedSlot.startAt && !slot.isBooked,
+      );
+
+      if (!liveSlot) {
+        setSelectedSlot(null);
+        setStep('calendar');
+        setBookingError('Выбранный слот уже занят. Выберите другое время.');
+        return;
+      }
+
+      createBooking.mutate(
+        {
+          eventTypeId,
+          guestName: values.guestName,
+          guestEmail: values.guestEmail,
+          startAt: liveSlot.startAt,
+        },
+        {
+          onSuccess: () => setStep('success'),
+          onError: (err) => {
+            if (err instanceof ApiError) {
+              if ((err.data as { error?: string })?.error === 'SLOT_ALREADY_BOOKED') {
+                setSelectedSlot(null);
+                setStep('calendar');
+                void queryClient.invalidateQueries({ queryKey: ['slots'] });
+              }
+
+              setBookingError(
+                (err.data as { message?: string })?.message ?? err.message,
+              );
+            } else {
+              setBookingError('Произошла ошибка при создании бронирования');
+            }
+          },
+        },
+      );
+    },
+    [
+      daySlots,
+      eventTypeId,
+      refetchDaySlots,
+      queryClient,
+      selectedDate,
+      selectedSlot,
+      createBooking,
+    ],
+  );
+
+  const handleBookAnother = useCallback(() => {
+    navigate({ to: '/book' });
+  }, [navigate]);
+
+  if (settingsLoading || typesLoading) {
+    return <Center py="xl"><Loader /></Center>;
+  }
+
+  if (!eventType) {
+    return (
+      <Container size="lg" py="xl">
+        <Text c="red">Тип события не найден</Text>
+      </Container>
+    );
+  }
+
+  return (
+    <Container size="xl" py="xl">
+      <Title order={2} mb="lg">Запись на звонок</Title>
+
+      <Grid gap="lg">
+        {/* Left column — summary */}
+        <Grid.Col span={{ base: 12, md: 3 }}>
+          {settings && (
+            <BookingSummary
+              settings={settings}
+              eventType={eventType}
+              selectedDate={selectedDate}
+              selectedSlot={step === 'calendar' ? calendarSelectedSlot : selectedSlot}
+              freeCount={freeCount}
+              totalCount={totalCount}
+            />
+          )}
+        </Grid.Col>
+
+        {/* Center column — calendar (only in calendar step) */}
+        {step === 'calendar' && (
+          <Grid.Col span={{ base: 12, md: 5 }}>
+            <Paper withBorder p="lg" radius="md">
+              <Stack gap="md">
+                <Title order={4}>Календарь</Title>
+                <SlotCalendar
+                  value={selectedDate}
+                  onChange={(date) => {
+                    setSelectedDate(date);
+                    setSelectedSlot(null);
+                    setBookingError(null);
+                  }}
+                  monthSlots={monthSlots ?? []}
+                  onMonthChange={setCurrentMonth}
+                />
+              </Stack>
+            </Paper>
+          </Grid.Col>
+        )}
+
+        {/* Right column — dynamic content */}
+        <Grid.Col span={{ base: 12, md: step === 'calendar' ? 4 : 9 }}>
+          {step === 'calendar' && (
+            <Paper
+              withBorder
+              p="lg"
+              radius="md"
+              style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 10rem)' }}
+            >
+              <Stack gap="md">
+                <Title order={4}>Статус слотов</Title>
+                {bookingError && (
+                  <Text c="red" size="sm">
+                    {bookingError}
+                  </Text>
+                )}
+                <ScrollArea.Autosize
+                  mah="calc(100vh - 20rem)"
+                  offsetScrollbars
+                  scrollbarSize={6}
+                >
+                  <SlotList
+                    slots={visibleDaySlots}
+                    selectedSlot={calendarSelectedSlot}
+                    onSelect={handleSlotSelect}
+                  />
+                </ScrollArea.Autosize>
+                <Group
+                  justify="space-between"
+                  mt="auto"
+                  pt="md"
+                  style={{ position: 'sticky', bottom: 0, backgroundColor: 'var(--mantine-color-body)' }}
+                >
+                  <Button
+                    variant="outline"
+                    color="gray"
+                    onClick={() => navigate({ to: '/book' })}
+                  >
+                    Назад
+                  </Button>
+                  <Button
+                    color="orange"
+                    disabled={!calendarSelectedSlot}
+                    onClick={handleContinue}
+                  >
+                    Продолжить
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          )}
+
+          {step === 'form' && (
+            <BookingForm
+              onSubmit={handleSubmit}
+              onBack={handleBack}
+              isLoading={createBooking.isPending}
+              error={bookingError}
+            />
+          )}
+
+          {step === 'success' && (
+            <BookingSuccess onBookAnother={handleBookAnother} />
+          )}
+        </Grid.Col>
+      </Grid>
+    </Container>
+  );
+}

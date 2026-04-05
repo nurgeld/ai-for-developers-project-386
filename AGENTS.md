@@ -81,10 +81,24 @@ import type { Booking } from '../api/types';
 - Use `useCallback`/`useMemo` when needed
 - Include accessibility attributes (alt, aria-label)
 
+### Routing (TanStack Router)
+- Code-based routing defined in `src/router.tsx`
+- Routes: `/` (home), `/book` (catalog), `/book/$eventTypeId` (booking), `/admin` (admin)
+- Type-safe navigation via `useNavigate()` and `Link`
+- Router registered globally via `declare module '@tanstack/react-router'`
+
+### State Management (TanStack Query)
+- All API data fetched via `useQuery` / `useMutation` hooks in `src/hooks/`
+- Query keys: `['settings']`, `['eventTypes']`, `['slots', ...]`, `['owner', 'bookings', ...]`
+- Mutations invalidate related queries on success
+- Local UI state (step, selectedDate, selectedSlot) managed via `useState`
+
 ### Mantine UI
 - Import styles in `App.tsx` (already done)
 - Use responsive props: `cols={{ base: 1, sm: 3 }}`
 - Follow Mantine prop naming (`c` for color, `fw` for fontWeight)
+- Forms via `@mantine/form` (`useForm` hook)
+- Calendar via `@mantine/dates` DatePicker with `renderDay` for slot counters
 
 ---
 
@@ -92,14 +106,45 @@ import type { Booking } from '../api/types';
 
 ```
 src/
-├── api/          # API client, types, generated code
-│   ├── client.ts      # API request functions
-│   ├── types.ts       # Re-exports from generated
-│   └── generated.ts   # OpenAPI-generated types
-├── components/   # Reusable UI components
-├── pages/        # Route-level components
-└── main.tsx      # App entry point
-docs/              # Mockups and design assets (gitignored)
+├── api/                    # API client, types, generated code
+│   ├── client.ts                # API request functions
+│   ├── types.ts                 # Re-exports from generated
+│   ├── generated.ts             # OpenAPI-generated types (do not edit)
+│   └── openapi.json             # OpenAPI spec (do not edit)
+├── components/
+│   ├── layout/
+│   │   └── Header.tsx           # Navigation (Записаться | Предстоящие события)
+│   ├── booking/
+│   │   ├── OwnerProfile.tsx     # Avatar + owner name
+│   │   ├── EventTypeCard.tsx    # Event type card (15/30 min)
+│   │   ├── BookingSummary.tsx   # Left sidebar with selected date/time
+│   │   ├── SlotCalendar.tsx     # DatePicker with renderDay slot counters
+│   │   ├── SlotList.tsx         # Slot list for selected day
+│   │   ├── BookingForm.tsx      # Guest name + email form
+│   │   └── BookingSuccess.tsx   # Success screen after booking
+│   └── admin/
+│       ├── BookingCard.tsx      # Single booking card with cancel button
+│       ├── BookingList.tsx      # List of owner bookings
+│       ├── OwnerSettingsForm.tsx # Owner settings form
+│       └── EventTypeManager.tsx # CRUD for event types
+├── hooks/
+│   ├── useOwnerSettings.ts      # useQuery: GET /api/settings
+│   ├── useEventTypes.ts         # useQuery: GET /api/event-types
+│   ├── useSlots.ts              # useQuery: GET /api/slots
+│   ├── useCreateBooking.ts      # useMutation: POST /api/bookings
+│   ├── useOwnerBookings.ts      # useQuery: GET /api/owner/bookings
+│   ├── useCancelBooking.ts      # useMutation: DELETE /api/owner/bookings/:id
+│   ├── useUpdateSettings.ts     # useMutation: PATCH /api/owner/settings
+│   └── useOwnerEventTypes.ts    # CRUD mutations for event types
+├── pages/
+│   ├── HomePage.tsx             # Landing page (/)
+│   ├── EventTypesPage.tsx       # Event type selection (/book)
+│   ├── BookingPage.tsx          # Booking flow with 3 steps (/book/:eventTypeId)
+│   └── AdminPage.tsx            # Admin with tabs: bookings + settings (/admin)
+├── router.tsx                   # TanStack Router route tree
+├── App.tsx                      # MantineProvider + QueryClient + RouterProvider
+└── main.tsx                     # ReactDOM entry point
+docs/                            # Mockups and design assets (gitignored)
 ```
 
 ---

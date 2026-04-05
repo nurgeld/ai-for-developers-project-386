@@ -1,22 +1,24 @@
 from app.models import (
     EventType,
     CreateEventTypeRequest,
+    UpdateEventTypeRequest,
     Slot,
     Booking,
     CreateBookingRequest,
-    AvailabilityPeriod,
-    CreateAvailabilityRequest,
+    OwnerSettings,
+    UpdateOwnerSettingsRequest,
 )
 from app.storage import storage, Storage
 
 __all__ = [
     "EventType",
     "CreateEventTypeRequest",
+    "UpdateEventTypeRequest",
     "Slot",
     "Booking",
     "CreateBookingRequest",
-    "AvailabilityPeriod",
-    "CreateAvailabilityRequest",
+    "OwnerSettings",
+    "UpdateOwnerSettingsRequest",
     "storage",
     "Storage",
 ]

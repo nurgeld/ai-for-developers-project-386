@@ -45,7 +45,18 @@ _start-vite-real:
 dev:
 	npm run dev
 dev-mock:
-	npm run dev:mock
+	@echo "Starting Prism mock API on port 4010..."
+	$(MAKE) --no-print-directory _start-mock-api
+	@echo "Waiting for Prism to be ready..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if curl -s http://127.0.0.1:4010/api/settings > /dev/null 2>&1; then \
+			echo "Prism is ready!"; \
+			break; \
+		fi; \
+		sleep 1; \
+	done
+	@echo "Starting Vite dev server..."
+	$(MAKE) --no-print-directory _start-vite-mock
 build:
 	npm run build
 lint:
