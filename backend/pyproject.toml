@@ -13,6 +13,7 @@ pydantic = "^2.5.0"
 
 [tool.poetry.group.dev.dependencies]
 httpx = "^0.26.0"
+pytest = "^8.4.2"
 
 [build-system]
 requires = ["poetry-core"]

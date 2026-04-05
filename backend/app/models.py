@@ -1,24 +1,30 @@
 from datetime import datetime
-from typing import Optional, Literal
-from pydantic import BaseModel, field_validator
+from typing import Literal, Optional
+
+from pydantic import BaseModel, field_validator, model_validator
+
+from app.time_utils import parse_clock
+
+
+DurationMinutes = Literal[15, 30]
 
 
 class EventType(BaseModel):
     id: str
     name: str
     description: str
-    durationMinutes: int
+    durationMinutes: DurationMinutes
 
 
 class CreateEventTypeRequest(BaseModel):
     name: str
     description: str
-    durationMinutes: int
+    durationMinutes: DurationMinutes
 
-    @field_validator('durationMinutes')
+    @field_validator("durationMinutes")
     def validate_duration(cls, v: int) -> int:
         if v not in (15, 30):
-            raise ValueError('durationMinutes must be 15 or 30')
+            raise ValueError("durationMinutes must be 15 or 30")
         return v
 
 
@@ -33,12 +39,30 @@ class OwnerSettings(BaseModel):
     workDayStart: str = "09:00"
     workDayEnd: str = "18:00"
 
+    @field_validator("workDayStart", "workDayEnd")
+    def validate_work_time_format(cls, value: str) -> str:
+        parse_clock(value)
+        return value
+
+    @model_validator(mode="after")
+    def validate_work_time_range(self) -> "OwnerSettings":
+        if parse_clock(self.workDayStart) >= parse_clock(self.workDayEnd):
+            raise ValueError("workDayStart must be earlier than workDayEnd")
+        return self
+
 
 class UpdateOwnerSettingsRequest(BaseModel):
     name: Optional[str] = None
     avatarUrl: Optional[str] = None
     workDayStart: Optional[str] = None
     workDayEnd: Optional[str] = None
+
+    @field_validator("workDayStart", "workDayEnd")
+    def validate_optional_work_time_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        parse_clock(value)
+        return value
 
 
 class Slot(BaseModel):
