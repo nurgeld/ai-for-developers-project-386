@@ -240,7 +240,7 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
     <Container size="xl" py="xl">
       <Title order={2} mb="lg">Запись на звонок</Title>
 
-      <Grid gap="lg">
+      <Grid gap="lg" style={{ alignItems: 'flex-end' }}>
         {/* Left column — summary */}
         <Grid.Col span={{ base: 12, md: 3 }}>
           {settings && (
@@ -277,23 +277,32 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
         )}
 
         {/* Right column — dynamic content */}
-        <Grid.Col span={{ base: 12, md: step === 'calendar' ? 4 : 9 }}>
+        <Grid.Col
+          span={{ base: 12, md: step === 'calendar' ? 4 : 9 }}
+          style={{
+            minHeight: 0,
+            maxHeight: '75vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           {step === 'calendar' && (
             <Paper
               withBorder
               p="lg"
               radius="md"
-              style={{ display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 10rem)' }}
+              style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, overflow: 'hidden' }}
             >
-              <Stack gap="md">
+              <Stack gap="md" style={{ minHeight: 0, flex: 1 }}>
                 <Title order={4}>Статус слотов</Title>
                 {bookingError && (
                   <Text c="red" size="sm">
                     {bookingError}
                   </Text>
                 )}
-                <ScrollArea.Autosize
-                  mah="calc(100vh - 16rem)"
+                <ScrollArea
+                  style={{ flex: 1, minHeight: 0 }}
                   offsetScrollbars
                   scrollbarSize={6}
                 >
@@ -302,12 +311,11 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
                     selectedSlot={calendarSelectedSlot}
                     onSelect={handleSlotSelect}
                   />
-                </ScrollArea.Autosize>
+                </ScrollArea>
                 <Group
                   justify="space-between"
-                  mt="auto"
                   pt="md"
-                  style={{ position: 'sticky', bottom: 0, backgroundColor: 'var(--mantine-color-body)' }}
+                  style={{ flexShrink: 0 }}
                 >
                   <Button
                     variant="outline"

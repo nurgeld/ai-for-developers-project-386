@@ -88,6 +88,7 @@ test('T05 enables continue after slot selection', async ({ page, api }) => {
 
   await getSlotStatusButton(page, lookup.slot, 'Свободно').click();
 
+  await expect(page.getByRole('button', { name: 'Продолжить' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Продолжить' })).toBeEnabled();
   await expect(page.getByText(formatSlotRange(lookup.slot)).first()).toBeVisible();
 });
