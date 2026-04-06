@@ -20,6 +20,7 @@ export function BookingForm({ onSubmit, onBack, isLoading, error }: BookingFormP
       guestEmail: (v) =>
         /^\S+@\S+\.\S+$/.test(v) ? null : 'Некорректный email',
     },
+    validateInputOnChange: true,
   });
 
   return (
@@ -36,7 +37,7 @@ export function BookingForm({ onSubmit, onBack, isLoading, error }: BookingFormP
               {...form.getInputProps('guestName')}
             />
             <TextInput
-              label="Email"
+              label="Электронная почта"
               placeholder="Email"
               type="email"
               required
