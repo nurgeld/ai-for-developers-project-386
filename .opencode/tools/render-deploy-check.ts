@@ -23,11 +23,6 @@ interface DeployInfo {
   commit: { id: string; message: string } | null;
 }
 
-interface RenderApiError {
-  error?: string;
-  message?: string;
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

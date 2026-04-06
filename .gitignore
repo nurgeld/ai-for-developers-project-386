@@ -45,3 +45,6 @@ venv/
 .env
 .env.local
 .env.*.local
+
+# TypeSpec generated output
+tsp-output/

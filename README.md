@@ -95,6 +95,26 @@ make mcp-chrome        # Start Chrome DevTools MCP
 
 Or configure in your IDE (configured in `.opencode/mcp.json` for OpenCode).
 
+### Render Deployment Status
+
+Check the deployment status of your Render service `nurgeldy-calendar-booking`.
+
+**Environment setup**:
+```bash
+export RENDER_API_KEY=rnd_your_api_key_here
+```
+
+**Usage**:
+```bash
+# Check status and wait for deployment to complete (max 5 min)
+make check-render
+
+# One-shot check (returns JSON for CI/CD)
+make check-render-quick
+```
+
+**Exit codes**: `0` = Deployed ✅, `1` = Failed ❌, `2` = Timeout ⏱️, `3` = Not found 🔍, `4` = API key not set
+
 ### Using Makefile
 
 ```bash
@@ -186,7 +206,6 @@ src/
 
 backend/
 ├── app/          # FastAPI application
-│   ├── main.py
 │   ├── models.py
 │   ├── storage.py
 │   ├── dependencies.py
