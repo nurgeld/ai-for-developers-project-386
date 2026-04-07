@@ -240,7 +240,7 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
     <Container size="xl" py="xl">
       <Title order={2} mb="lg">Запись на звонок</Title>
 
-      <Grid gap="lg" style={{ alignItems: 'flex-end' }}>
+      <Grid gap="lg" style={{ alignItems: step === 'calendar' ? 'stretch' : 'flex-start' }}>
         {/* Left column — summary */}
         <Grid.Col span={{ base: 12, md: 3 }}>
           {settings && (
@@ -258,8 +258,8 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
         {/* Center column — calendar (only in calendar step) */}
         {step === 'calendar' && (
           <Grid.Col span={{ base: 12, md: 5 }}>
-            <Paper withBorder p="lg" radius="md">
-              <Stack gap="md">
+            <Paper withBorder p="lg" radius="md" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <Stack gap="md" style={{ flex: 1 }}>
                 <Title order={4}>Календарь</Title>
                 <SlotCalendar
                   value={selectedDate}
@@ -292,7 +292,13 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
               withBorder
               p="lg"
               radius="md"
-              style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1, overflow: 'hidden' }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                flex: 1,
+                overflow: 'hidden',
+              }}
             >
               <Stack gap="md" style={{ minHeight: 0, flex: 1 }}>
                 <Title order={4}>Статус слотов</Title>
@@ -337,16 +343,20 @@ export function BookingPage({ eventTypeId }: BookingPageProps) {
           )}
 
           {step === 'form' && (
-            <BookingForm
-              onSubmit={handleSubmit}
-              onBack={handleBack}
-              isLoading={createBooking.isPending}
-              error={bookingError}
-            />
+            <ScrollArea style={{ maxHeight: '75vh' }}>
+              <BookingForm
+                onSubmit={handleSubmit}
+                onBack={handleBack}
+                isLoading={createBooking.isPending}
+                error={bookingError}
+              />
+            </ScrollArea>
           )}
 
           {step === 'success' && (
-            <BookingSuccess onBookAnother={handleBookAnother} />
+            <ScrollArea style={{ maxHeight: '75vh' }}>
+              <BookingSuccess onBookAnother={handleBookAnother} />
+            </ScrollArea>
           )}
         </Grid.Col>
       </Grid>

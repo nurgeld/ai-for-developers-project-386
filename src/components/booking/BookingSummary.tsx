@@ -22,8 +22,8 @@ export function BookingSummary({
   totalCount,
 }: BookingSummaryProps) {
   return (
-    <Paper withBorder p="lg" radius="md">
-      <Stack gap="md">
+    <Paper withBorder p="lg" radius="md" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <Stack gap="md" style={{ flex: 1 }}>
         <OwnerProfile settings={settings} />
 
         <div>
@@ -31,7 +31,7 @@ export function BookingSummary({
           <Text size="sm" c="dimmed">{eventType.description}</Text>
         </div>
 
-        <Paper bg="blue.0" p="sm" radius="sm">
+        <Paper bg="orange.0" p="sm" radius="sm">
           <Text size="xs" c="dimmed">Выбранная дата</Text>
           <Text fw={500}>
             {selectedDate
@@ -40,7 +40,7 @@ export function BookingSummary({
           </Text>
         </Paper>
 
-        <Paper bg="blue.0" p="sm" radius="sm">
+        <Paper bg="orange.0" p="sm" radius="sm">
           <Text size="xs" c="dimmed">Выбранное время</Text>
           <Text fw={500}>
             {selectedSlot
@@ -49,12 +49,12 @@ export function BookingSummary({
           </Text>
         </Paper>
 
-        <Paper bg="blue.0" p="sm" radius="sm">
+        <Paper bg="orange.0" p="sm" radius="sm">
           <Text size="xs" c="dimmed">Свободно</Text>
           <Text fw={500}>{freeCount}</Text>
         </Paper>
 
-        <Paper bg="blue.0" p="sm" radius="sm">
+        <Paper bg="orange.0" p="sm" radius="sm">
           <Text size="xs" c="dimmed">Длительности в дне</Text>
           <Text fw={500}>
             {totalCount > 0
