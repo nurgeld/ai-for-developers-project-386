@@ -16,34 +16,77 @@ export function AdminPage() {
       </Group>
 
       <Paper withBorder radius="md">
-        <Tabs 
-          defaultValue="bookings" 
-          variant="outline"
-          styles={{
-            list: {
-              borderBottom: 'none',
-            },
-            tab: {
-              borderTop: '3px solid transparent',
-              borderBottom: 'none',
-              borderLeft: 'none',
-              borderRight: 'none',
-              '&[data-active]': {
-                borderTopColor: 'var(--mantine-color-orange-5)',
+        <Tabs defaultValue="bookings">
+          <Tabs.List 
+            p="xs" 
+            style={{ 
+              borderBottom: '1px solid var(--mantine-color-gray-3)',
+            }}
+          >
+            <Tabs.Tab 
+              value="bookings" 
+              leftSection={<IconList size={16} />}
+              style={{
+                border: '1px solid transparent',
                 borderBottom: 'none',
-                backgroundColor: 'var(--mantine-color-orange-0)',
-              },
-            },
-          }}
-        >
-          <Tabs.List p="xs">
-            <Tabs.Tab value="bookings" leftSection={<IconList size={16} />}>
+                borderRadius: 'var(--mantine-radius-sm) var(--mantine-radius-sm) 0 0',
+                marginBottom: '-1px',
+              }}
+              styles={{
+                tab: {
+                  '&[data-active]': {
+                    borderColor: 'var(--mantine-color-gray-3)',
+                    borderTop: '3px solid var(--mantine-color-orange-5)',
+                    backgroundColor: 'var(--mantine-color-body)',
+                    color: 'var(--mantine-color-orange-5)',
+                  },
+                },
+              }}
+            >
               Бронирования
             </Tabs.Tab>
-            <Tabs.Tab value="schedule" leftSection={<IconCalendar size={16} />}>
+            <Tabs.Tab 
+              value="schedule" 
+              leftSection={<IconCalendar size={16} />}
+              style={{
+                border: '1px solid transparent',
+                borderBottom: 'none',
+                borderRadius: 'var(--mantine-radius-sm) var(--mantine-radius-sm) 0 0',
+                marginBottom: '-1px',
+              }}
+              styles={{
+                tab: {
+                  '&[data-active]': {
+                    borderColor: 'var(--mantine-color-gray-3)',
+                    borderTop: '3px solid var(--mantine-color-orange-5)',
+                    backgroundColor: 'var(--mantine-color-body)',
+                    color: 'var(--mantine-color-orange-5)',
+                  },
+                },
+              }}
+            >
               Расписание
             </Tabs.Tab>
-            <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>
+            <Tabs.Tab 
+              value="settings" 
+              leftSection={<IconSettings size={16} />}
+              style={{
+                border: '1px solid transparent',
+                borderBottom: 'none',
+                borderRadius: 'var(--mantine-radius-sm) var(--mantine-radius-sm) 0 0',
+                marginBottom: '-1px',
+              }}
+              styles={{
+                tab: {
+                  '&[data-active]': {
+                    borderColor: 'var(--mantine-color-gray-3)',
+                    borderTop: '3px solid var(--mantine-color-orange-5)',
+                    backgroundColor: 'var(--mantine-color-body)',
+                    color: 'var(--mantine-color-orange-5)',
+                  },
+                },
+              }}
+            >
               Настройки
             </Tabs.Tab>
           </Tabs.List>
