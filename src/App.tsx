@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
+import '@mantine/schedule/styles.css';
 import { router } from './router';
 
 const queryClient = new QueryClient({
