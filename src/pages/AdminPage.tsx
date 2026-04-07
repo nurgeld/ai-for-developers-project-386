@@ -1,4 +1,4 @@
-import { Container, Title, Tabs, Stack, Group, ThemeIcon, Paper } from '@mantine/core';
+import { Container, Title, Tabs, Stack, Group, ThemeIcon, Paper, Box } from '@mantine/core';
 import { IconList, IconCalendar, IconSettings } from '@tabler/icons-react';
 import { BookingList } from '../components/admin/BookingList';
 import { OwnerSettingsForm } from '../components/admin/OwnerSettingsForm';
@@ -18,9 +18,10 @@ export function AdminPage() {
       <Paper withBorder radius="md">
         <Tabs defaultValue="bookings">
           <Tabs.List 
-            p="xs" 
             style={{ 
-              borderBottom: '1px solid var(--mantine-color-gray-3)',
+              borderBottom: 'none',
+              gap: '4px',
+              padding: '12px 16px 0',
             }}
           >
             <Tabs.Tab 
@@ -28,20 +29,14 @@ export function AdminPage() {
               leftSection={<IconList size={16} />}
               style={{
                 border: '1px solid transparent',
-                borderBottom: 'none',
-                borderRadius: 'var(--mantine-radius-sm) var(--mantine-radius-sm) 0 0',
+                borderBottom: '1px solid transparent',
+                borderRadius: '8px 8px 0 0',
+                backgroundColor: 'transparent',
                 marginBottom: '-1px',
+                position: 'relative',
+                zIndex: 2,
               }}
-              styles={{
-                tab: {
-                  '&[data-active]': {
-                    borderColor: 'var(--mantine-color-gray-3)',
-                    borderTop: '3px solid var(--mantine-color-orange-5)',
-                    backgroundColor: 'var(--mantine-color-body)',
-                    color: 'var(--mantine-color-orange-5)',
-                  },
-                },
-              }}
+              className="admin-tab"
             >
               Бронирования
             </Tabs.Tab>
@@ -50,20 +45,14 @@ export function AdminPage() {
               leftSection={<IconCalendar size={16} />}
               style={{
                 border: '1px solid transparent',
-                borderBottom: 'none',
-                borderRadius: 'var(--mantine-radius-sm) var(--mantine-radius-sm) 0 0',
+                borderBottom: '1px solid transparent',
+                borderRadius: '8px 8px 0 0',
+                backgroundColor: 'transparent',
                 marginBottom: '-1px',
+                position: 'relative',
+                zIndex: 2,
               }}
-              styles={{
-                tab: {
-                  '&[data-active]': {
-                    borderColor: 'var(--mantine-color-gray-3)',
-                    borderTop: '3px solid var(--mantine-color-orange-5)',
-                    backgroundColor: 'var(--mantine-color-body)',
-                    color: 'var(--mantine-color-orange-5)',
-                  },
-                },
-              }}
+              className="admin-tab"
             >
               Расписание
             </Tabs.Tab>
@@ -72,39 +61,49 @@ export function AdminPage() {
               leftSection={<IconSettings size={16} />}
               style={{
                 border: '1px solid transparent',
-                borderBottom: 'none',
-                borderRadius: 'var(--mantine-radius-sm) var(--mantine-radius-sm) 0 0',
+                borderBottom: '1px solid transparent',
+                borderRadius: '8px 8px 0 0',
+                backgroundColor: 'transparent',
                 marginBottom: '-1px',
+                position: 'relative',
+                zIndex: 2,
               }}
-              styles={{
-                tab: {
-                  '&[data-active]': {
-                    borderColor: 'var(--mantine-color-gray-3)',
-                    borderTop: '3px solid var(--mantine-color-orange-5)',
-                    backgroundColor: 'var(--mantine-color-body)',
-                    color: 'var(--mantine-color-orange-5)',
-                  },
-                },
-              }}
+              className="admin-tab"
             >
               Настройки
             </Tabs.Tab>
           </Tabs.List>
 
-          <Tabs.Panel value="bookings" p="lg">
-            <BookingList />
-          </Tabs.Panel>
+          <style>{`
+            .admin-tab[data-active="true"] {
+              border: 1px solid #dee2e6 !important;
+              border-top: 3px solid #F06418 !important;
+              border-bottom: 1px solid white !important;
+              background-color: white !important;
+              color: #F06418 !important;
+              font-weight: 600 !important;
+            }
+            .admin-tab:hover:not([data-active="true"]) {
+              background-color: #f8f9fa !important;
+            }
+          `}</style>
 
-          <Tabs.Panel value="schedule" p="lg">
-            <ScheduleView />
-          </Tabs.Panel>
+          <Box p="lg" pt="md">
+            <Tabs.Panel value="bookings">
+              <BookingList />
+            </Tabs.Panel>
 
-          <Tabs.Panel value="settings" p="lg">
-            <Stack gap="xl">
-              <OwnerSettingsForm />
-              <EventTypeManager />
-            </Stack>
-          </Tabs.Panel>
+            <Tabs.Panel value="schedule">
+              <ScheduleView />
+            </Tabs.Panel>
+
+            <Tabs.Panel value="settings">
+              <Stack gap="xl">
+                <OwnerSettingsForm />
+                <EventTypeManager />
+              </Stack>
+            </Tabs.Panel>
+          </Box>
         </Tabs>
       </Paper>
     </Container>

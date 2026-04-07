@@ -19,10 +19,3 @@ body {
   outline: none !important;
   box-shadow: none !important;
 }
-
-/* Calendar day sizing */
-.mantine-DatePicker-day {
-  width: 48px !important;
-  height: 48px !important;
-  font-size: 15px !important;
-}

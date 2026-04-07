@@ -30,8 +30,6 @@ export function SlotCalendar({
     return map;
   }, [monthSlots]);
 
-  const selectedKey = value ? dayjs(value).format('YYYY-MM-DD') : null;
-
   return (
     <Box
       style={{
@@ -55,7 +53,7 @@ export function SlotCalendar({
           onMonthChange(dayjs(dateStr).toDate());
         }}
         locale="ru"
-        size="xl"
+        size="lg"
         firstDayOfWeek={1}
         minDate={today.format('YYYY-MM-DD')}
         excludeDate={(date) => dayjs(date).isBefore(today, 'day')}
@@ -67,43 +65,15 @@ export function SlotCalendar({
           const count = freeCountByDate[key];
           const hasAvailability = count !== undefined && count > 0 && !isPast;
 
-          return {
-            'data-availability': hasAvailability ? 'true' : 'false',
-          };
-        }}
-        renderDay={(date) => {
-          const day = dayjs(date);
-          const key = day.format('YYYY-MM-DD');
-          const count = freeCountByDate[key];
-          const isSelected = selectedKey === key;
-          const isPast = day.isBefore(today, 'day');
-          const hasAvailability = count !== undefined && count > 0 && !isPast;
+          if (hasAvailability) {
+            return {
+              style: {
+                fontWeight: 600,
+              },
+            };
+          }
 
-          return (
-            <Box
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                height: '100%',
-              }}
-            >
-              <span>{day.date()}</span>
-              {hasAvailability && !isSelected && (
-                <Box
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--mantine-color-orange-5)',
-                    marginTop: 3,
-                  }}
-                />
-              )}
-            </Box>
-          );
+          return {};
         }}
       />
     </Box>
